@@ -1,1 +1,0 @@
-"""Manejadores de comandos del simulador."""

@@ -10,7 +10,7 @@ Crear un programa Python que permita:
 
 - Generar pares de claves pública/privada.
 - Almacenar claves con alias identificativos.
-- Exportar y leer información asociada a los certificados.
+- Consultar desde Python la información de una entrada del KeyStore.
 - Simular funcionalidades básicas de `keytool` en un entorno de consola.
 
 ## Requisitos
@@ -63,8 +63,10 @@ Pr-cticaKeytoolPython/
 ├── genkeypair.py         # Generacion RSA y flujo interactivo
 ├── keystore.py           # Cifrado, lectura y escritura del KeyStore
 ├── certreq.py            # Comando de solicitudes CSR
-├── README.md            # Documentación del proyecto
-├── requirements.txt     # Dependencias del proyecto
+├── tests/
+│   └── test_mykeytool.py
+├── README.md             # Documentación del proyecto
+├── requirements.txt      # Dependencias del proyecto
 ├── .venv/               # Entorno virtual recomendado
 ├── env/                 # Entorno virtual antiguo (opcional)
 └── .gitignore           # Archivos ignorados por Git
@@ -180,15 +182,6 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 ```powershell
 .\.venv\Scripts\python.exe .\mykeytool.py --genkeypair -keyalg RSA
 ```
-
-## Ejemplo de funcionalidad
-
-Se espera que el proyecto permita, como mínimo:
-
-- Generar claves RSA.
-- Mostrar información del almacén de claves.
-- Identificar cada clave mediante un alias.
-- Guardar y recuperar la información de forma segura.
 
 ## Nota
 

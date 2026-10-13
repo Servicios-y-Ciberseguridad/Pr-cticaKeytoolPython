@@ -1,1 +1,0 @@
-"""Persistencia y acceso al almacenamiento de claves."""

@@ -14,7 +14,7 @@ except ModuleNotFoundError:
     serialization = None
     rsa = None
 
-from ..storage.keystore import (
+from keystore import (
     DEFAULT_KEYSTORE,
     DN_FIELDS,
     UNKNOWN_DN_VALUE,

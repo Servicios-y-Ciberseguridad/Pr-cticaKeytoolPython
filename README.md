@@ -59,18 +59,15 @@ Este proyecto usa la librería `cryptography`, que permite generar claves, certi
 
 ```text
 Pr-cticaKeytoolPython/
-├── keytool/
-│   ├── commands/
-│   │   ├── certreq.py    # Comando CSR
-│   │   └── genkeypair.py # Generacion RSA y flujo interactivo
-│   └── storage/
-│       └── keystore.py  # Cifrado, lectura y escritura del KeyStore
-├── mykeytool.py         # Lanzador CLI compatible
-├── tests/
-│   └── test_mykeytool.py
-├── README.md
-├── requirements.txt
-└── .gitignore
+├── mykeytool.py          # CLI y enrutamiento de comandos
+├── genkeypair.py         # Generacion RSA y flujo interactivo
+├── keystore.py           # Cifrado, lectura y escritura del KeyStore
+├── certreq.py            # Comando de solicitudes CSR
+├── README.md            # Documentación del proyecto
+├── requirements.txt     # Dependencias del proyecto
+├── .venv/               # Entorno virtual recomendado
+├── env/                 # Entorno virtual antiguo (opcional)
+└── .gitignore           # Archivos ignorados por Git
 ```
 
 ## Uso previsto
@@ -156,7 +153,7 @@ Para recuperar una entrada desde otro código Python, `load_keystore_entry` aute
 from getpass import getpass
 from pathlib import Path
 
-from keytool import load_keystore_entry
+from mykeytool import load_keystore_entry
 
 store_password = getpass("Contraseña del KeyStore: ")
 entry = load_keystore_entry(Path("keystore.myks"), "mykey", store_password)

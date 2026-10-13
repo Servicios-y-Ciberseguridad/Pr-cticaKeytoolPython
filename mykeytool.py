@@ -11,8 +11,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TypedDict
 
-from keytool.commands.certreq import handle_certreq
-from keytool.commands.genkeypair import (
+from certreq import handle_certreq
+from genkeypair import (
     MAX_ALIAS_ATTEMPTS,
     MAX_PASSWORD_ATTEMPTS,
     handle_genkeypair,
@@ -30,7 +30,7 @@ from keytool.commands.genkeypair import (
     resolve_unique_alias,
     validate_country,
 )
-from keytool.storage.keystore import (
+from keystore import (
     AES_GCM_TAG_SIZE,
     CRYPTO_IMPORT_ERROR,
     DEFAULT_KEYSTORE,

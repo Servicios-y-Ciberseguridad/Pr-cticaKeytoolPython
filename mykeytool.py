@@ -208,7 +208,6 @@ def resolve_key_algorithm(keyalg: str | None) -> str:
         raise ValueError("Solo se admite -keyalg RSA en esta implementacion.")
     return algorithm
 
-
 def resolve_key_size(keysize: int | None) -> int:
     if keysize is not None:
         resolved = keysize
@@ -217,8 +216,8 @@ def resolve_key_size(keysize: int | None) -> int:
         resolved = 2048 if entered == "" else int(entered)
     if resolved < 1024:
         raise ValueError("-keysize debe ser un entero de al menos 1024 bits.")
+    
     return resolved
-
 
 def parse_dname(dname: str) -> dict[str, str]:
     parts = [part.strip() for part in dname.split(",") if part.strip()]
@@ -236,7 +235,6 @@ def parse_dname(dname: str) -> dict[str, str]:
         raise ValueError("-dname debe incluir exactamente CN, OU, O, L, ST y C.")
     return values
 
-
 def validate_country(dn: dict[str, str]) -> None:
     country = dn["C"]
     if country == UNKNOWN_DN_VALUE:
@@ -244,7 +242,6 @@ def validate_country(dn: dict[str, str]) -> None:
     if len(country) != 2 or not country.isascii() or not country.isalpha():
         raise ValueError("C debe ser un codigo de pais de dos letras (p. ej. ES).")
     dn["C"] = country.upper()
-
 
 def read_dname_interactively() -> dict[str, str]:
     prompts = {
@@ -261,6 +258,7 @@ def read_dname_interactively() -> dict[str, str]:
             field: input(prompts[field]).strip() or UNKNOWN_DN_VALUE
             for field in DN_FIELDS
         }
+
         validate_country(dn)
         rendered = ", ".join(f"{field}={dn[field]}" for field in DN_FIELDS)
         confirmation = input(f"Is {rendered} correct? [no/yes]: ").strip().lower()
@@ -269,14 +267,12 @@ def read_dname_interactively() -> dict[str, str]:
         if confirmation in {"", "n", "no"}:
             continue
 
-
 def resolve_dname(dname: str | None) -> dict[str, str]:
     if dname is not None:
         parsed = parse_dname(dname)
         validate_country(parsed)
         return parsed
     return read_dname_interactively()
-
 
 def read_store_password(path: Path, storepass: str | None) -> str:
     if storepass is not None:
@@ -291,7 +287,6 @@ def read_store_password(path: Path, storepass: str | None) -> str:
         if storepass is None and read_password("Re-enter new password: ") != password:
             raise ValueError("Las contrasenas no coinciden.")
     return password
-
 
 def open_keystore_with_password(
     path: Path, storepass: str | None
@@ -345,7 +340,6 @@ def open_keystore_with_password(
     assert last_error is not None
     raise last_error
 
-
 def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str:
     if keypass is not None:
         if not keypass:
@@ -360,7 +354,6 @@ def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str
         raise ValueError("Las contrasenas de la clave no coinciden.")
     return password
 
-
 def resolve_alias(alias: str | None) -> str:
     if alias is not None:
         resolved = alias.strip()
@@ -374,7 +367,6 @@ def resolve_alias(alias: str | None) -> str:
     if not resolved:
         raise ValueError("Los campos solicitados no pueden estar vacios.")
     return resolved
-
 
 def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str:
     if alias is not None:
@@ -396,7 +388,6 @@ def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str
             file=sys.stderr,
         )
     raise ValueError(f"El alias '{last_alias}' ya existe.")
-
 
 def handle_genkeypair(
     path: Path = DEFAULT_KEYSTORE,
@@ -457,7 +448,6 @@ def handle_certreq() -> int:
     print("La generacion de solicitudes CSR se implementara en el siguiente modulo.")
     return 0
 
-
 def print_genkeypair_help() -> None:
     print(
         "usage: mykeytool.py -genkeypair -keyalg KEYALG [-keystore KEYSTORE] "
@@ -476,7 +466,6 @@ def print_genkeypair_help() -> None:
     print("  -storepass STOREPASS", file=sys.stderr)
     print("  -keypass KEYPASS", file=sys.stderr)
     print("  -keysize KEYSIZE", file=sys.stderr)
-
 
 def print_main_help() -> None:
     print("usage: mykeytool.py [command]", file=sys.stdout)

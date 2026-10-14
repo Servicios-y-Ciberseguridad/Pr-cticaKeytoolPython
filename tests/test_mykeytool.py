@@ -6,11 +6,14 @@ import warnings
 from pathlib import Path
 from unittest.mock import patch
 
+from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.x509.oid import NameOID
 
 import mykeytool
+from certreq import resolve_output_path
 
 
 class GenKeyPairTests(unittest.TestCase):
@@ -22,7 +25,12 @@ class GenKeyPairTests(unittest.TestCase):
 
     def generate(self, alias="miClave", password=None, dn=None):
         password = self.password if password is None else password
-        passwords = [password, password, ""] if not self.path.exists() else [password, ""]
+        if not self.path.exists():
+            passwords = [password, password, ""]
+        elif password == self.password:
+            passwords = [password, ""]
+        else:
+            passwords = [password] * mykeytool.MAX_PASSWORD_ATTEMPTS
         fields = dn if dn is not None else ["Ana", "TI", "Empresa", "Madrid", "Madrid", "es"]
         output = io.StringIO()
         errors = io.StringIO()
@@ -338,6 +346,88 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertIn("Solo se admite -keyalg RSA", errors.getvalue())
         self.assertFalse(self.path.exists())
 
+    def test_main_facade_exposes_crypto_and_keysize_checks_from_txt(self):
+        self.assertTrue(mykeytool.is_crypto_library_available())
+        for keysize in (2048, 3072, 4096, 7680, 15360):
+            self.assertTrue(mykeytool.is_key_size_supported(keysize))
+        self.assertFalse(mykeytool.is_key_size_supported(1024))
+
+    def test_key_size_prompt_displays_every_supported_option(self):
+        with patch("builtins.input", return_value="") as input_mock:
+            self.assertEqual(mykeytool.resolve_key_size(None), 2048)
+        prompt = input_mock.call_args.args[0]
+        for keysize in mykeytool.SUPPORTED_KEY_SIZES:
+            self.assertIn(str(keysize), prompt)
+
+    def test_rejects_unsupported_key_size(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-genkeypair",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "mykey",
+                "-storepass",
+                self.password,
+                "-keypass",
+                self.password,
+                "-keyalg",
+                "RSA",
+                "-keysize",
+                "1024",
+                "-dname",
+                "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES",
+            ])
+        self.assertEqual(result, 1)
+        self.assertIn("valores", errors.getvalue())
+        self.assertFalse(self.path.exists())
+
+    def test_interactive_algorithm_and_key_size_are_requested_until_valid(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        answers = [
+            "EC",
+            "RSA",
+            "1024",
+            "2048",
+            "miClave",
+            "Ana",
+            "TI",
+            "Empresa",
+            "Madrid",
+            "Madrid",
+            "ES",
+            "yes",
+        ]
+        with (
+            patch(
+                "mykeytool.getpass.getpass",
+                side_effect=[self.password, self.password, ""],
+            ),
+            patch("builtins.input", side_effect=answers),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-genkeypair",
+                "-keystore",
+                str(self.path),
+            ])
+        self.assertEqual(result, 0, errors.getvalue())
+        self.assertIn("algoritmo no valido", errors.getvalue())
+        self.assertIn("tamano no valido", errors.getvalue())
+        entry = mykeytool.load_keystore(self.path, self.password)["miClave"]
+        private = serialization.load_pem_private_key(
+            entry["private_key"].encode("ascii"),
+            password=self.password.encode("utf-8"),
+        )
+        self.assertEqual(private.key_size, 2048)
+
     def test_preserves_existing_entries(self):
         self.assertEqual(self.generate()[0], 0)
         original = mykeytool.load_keystore(self.path, self.password)["miClave"]
@@ -356,37 +446,7 @@ class GenKeyPairTests(unittest.TestCase):
             self.assertIn(message, errors)
             self.assertEqual(self.path.read_bytes(), before)
 
-    def test_existing_keystore_allows_three_password_attempts(self):
-        self.assertEqual(self.generate()[0], 0)
-        output = io.StringIO()
-        errors = io.StringIO()
-        answers = ["segunda", "Ana", "TI", "Empresa", "Madrid", "Madrid", "ES", "yes"]
-        with (
-            patch(
-                "mykeytool.getpass.getpass",
-                side_effect=["wrong-1", "wrong-2", self.password, ""],
-            ) as getpass_mock,
-            patch("builtins.input", side_effect=answers),
-            contextlib.redirect_stdout(output),
-            contextlib.redirect_stderr(errors),
-        ):
-            result = mykeytool.main([
-                "-genkeypair",
-                "-keystore",
-                str(self.path),
-                "-keyalg",
-                "RSA",
-                "-keysize",
-                "2048",
-            ])
-        self.assertEqual(result, 0, errors.getvalue())
-        self.assertIn("Intentos restantes: 2", errors.getvalue())
-        self.assertIn("Intentos restantes: 1", errors.getvalue())
-        self.assertTrue(getpass_mock.called)
-        entries = mykeytool.load_keystore(self.path, self.password)
-        self.assertIn("segunda", entries)
-
-    def test_existing_keystore_fails_after_three_wrong_password_attempts(self):
+    def test_genkeypair_fails_after_one_wrong_store_password(self):
         self.assertEqual(self.generate()[0], 0)
         before = self.path.read_bytes()
         output = io.StringIO()
@@ -394,8 +454,8 @@ class GenKeyPairTests(unittest.TestCase):
         with (
             patch(
                 "mykeytool.getpass.getpass",
-                side_effect=["wrong-1", "wrong-2", "wrong-3"],
-            ),
+                return_value="wrong-password",
+            ) as getpass_mock,
             contextlib.redirect_stdout(output),
             contextlib.redirect_stderr(errors),
         ):
@@ -409,66 +469,10 @@ class GenKeyPairTests(unittest.TestCase):
                 "2048",
             ])
         self.assertEqual(result, 1)
-        self.assertIn("Se agotaron los 3 intentos", errors.getvalue())
+        self.assertEqual(getpass_mock.call_count, 1)
+        self.assertIn("incorrecta", errors.getvalue())
+        self.assertNotIn("Intentos restantes", errors.getvalue())
         self.assertEqual(self.path.read_bytes(), before)
-
-    def test_new_keystore_allows_three_attempts_for_short_or_mismatched_password(self):
-        output = io.StringIO()
-        errors = io.StringIO()
-        answers = ["miClave", "Ana", "TI", "Empresa", "Madrid", "Madrid", "ES", "yes"]
-        with (
-            patch(
-                "mykeytool.getpass.getpass",
-                side_effect=[
-                    "short",
-                    "test-password-123",
-                    "different",
-                    "test-password-123",
-                    "test-password-123",
-                    "",
-                ],
-            ),
-            patch("builtins.input", side_effect=answers),
-            contextlib.redirect_stdout(output),
-            contextlib.redirect_stderr(errors),
-        ):
-            result = mykeytool.main([
-                "-genkeypair",
-                "-keystore",
-                str(self.path),
-                "-keyalg",
-                "RSA",
-                "-keysize",
-                "2048",
-            ])
-        self.assertEqual(result, 0, errors.getvalue())
-        self.assertIn("8 caracteres", errors.getvalue())
-        self.assertIn("no coinciden", errors.getvalue())
-        self.assertTrue(self.path.exists())
-
-    def test_new_keystore_fails_after_three_invalid_password_attempts(self):
-        output = io.StringIO()
-        errors = io.StringIO()
-        with (
-            patch(
-                "mykeytool.getpass.getpass",
-                side_effect=["short", "tiny", "small"],
-            ),
-            contextlib.redirect_stdout(output),
-            contextlib.redirect_stderr(errors),
-        ):
-            result = mykeytool.main([
-                "-genkeypair",
-                "-keystore",
-                str(self.path),
-                "-keyalg",
-                "RSA",
-                "-keysize",
-                "2048",
-            ])
-        self.assertEqual(result, 1)
-        self.assertIn("Se agotaron los 3 intentos", errors.getvalue())
-        self.assertFalse(self.path.exists())
 
     def test_duplicate_alias_allows_three_interactive_attempts(self):
         self.assertEqual(self.generate()[0], 0)
@@ -743,10 +747,262 @@ class GenKeyPairTests(unittest.TestCase):
         )
         self.assertEqual(private.key_size, 2048)
 
-    def test_certreq_behavior_is_preserved(self):
-        with contextlib.redirect_stdout(io.StringIO()) as output:
-            self.assertEqual(mykeytool.main(["--certreq"]), 0)
-        self.assertIn("--certreq seleccionado", output.getvalue())
+    def test_certreq_generates_valid_pem_with_expected_subject_and_public_key(self):
+        self.assertEqual(self.generate()[0], 0)
+        csr_path = self.path.with_suffix(".csr")
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "--certreq",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "miClave",
+                "-storepass",
+                self.password,
+                "-keypass",
+                self.password,
+                "-file",
+                str(csr_path),
+            ])
+
+        self.assertEqual(result, 0, errors.getvalue())
+        self.assertIn("Exito", output.getvalue())
+        self.assertNotIn(self.password, output.getvalue() + errors.getvalue())
+        pem = csr_path.read_bytes()
+        self.assertTrue(pem.startswith(b"-----BEGIN CERTIFICATE REQUEST-----"))
+        self.assertNotIn(b"PRIVATE KEY", pem)
+
+        csr = x509.load_pem_x509_csr(pem)
+        self.assertTrue(csr.is_signature_valid)
+        self.assertEqual(csr.signature_hash_algorithm.name, "sha256")
+        expected_subject = {
+            NameOID.COMMON_NAME: "Ana",
+            NameOID.ORGANIZATIONAL_UNIT_NAME: "TI",
+            NameOID.ORGANIZATION_NAME: "Empresa",
+            NameOID.LOCALITY_NAME: "Madrid",
+            NameOID.STATE_OR_PROVINCE_NAME: "Madrid",
+            NameOID.COUNTRY_NAME: "ES",
+        }
+        for oid, expected in expected_subject.items():
+            self.assertEqual(csr.subject.get_attributes_for_oid(oid)[0].value, expected)
+
+        entry = mykeytool.load_keystore(self.path, self.password)["miClave"]
+        stored_public = serialization.load_pem_public_key(
+            entry["public_key"].encode("ascii")
+        )
+        self.assertEqual(
+            csr.public_key().public_numbers(),
+            stored_public.public_numbers(),
+        )
+
+    def test_certreq_prompts_for_store_password_alias_and_key_password(self):
+        self.assertEqual(self.generate()[0], 0)
+        csr_path = self.path.with_suffix(".csr")
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            patch(
+                "mykeytool.getpass.getpass",
+                side_effect=[self.password, ""],
+            ) as getpass_mock,
+            patch("builtins.input", side_effect=["miClave"]),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-certreq",
+                "-keystore",
+                str(self.path),
+                "-file",
+                str(csr_path),
+            ])
+
+        self.assertEqual(result, 0, errors.getvalue())
+        self.assertEqual(getpass_mock.call_count, 2)
+        self.assertTrue(csr_path.exists())
+
+    def test_certreq_fails_after_one_wrong_store_password(self):
+        self.assertEqual(self.generate()[0], 0)
+        csr_path = self.path.with_suffix(".csr")
+        errors = io.StringIO()
+        with (
+            patch(
+                "mykeytool.getpass.getpass",
+                return_value="wrong-password",
+            ) as getpass_mock,
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-certreq",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "miClave",
+                "-file",
+                str(csr_path),
+            ])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(getpass_mock.call_count, 1)
+        self.assertIn("incorrecta", errors.getvalue())
+        self.assertNotIn("Intentos restantes", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+        self.assertFalse(csr_path.exists())
+
+    def test_certreq_uses_alias_csr_as_default_output(self):
+        self.assertEqual(resolve_output_path(None, "miClave"), Path("miClave.csr"))
+        self.assertEqual(
+            resolve_output_path(None, "equipo/produccion"),
+            Path("equipo_produccion.csr"),
+        )
+
+    def test_certreq_rejects_missing_alias_without_creating_output(self):
+        self.assertEqual(self.generate()[0], 0)
+        csr_path = self.path.with_suffix(".csr")
+        before = self.path.read_bytes()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-certreq",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "no-existe",
+                "-storepass",
+                self.password,
+                "-file",
+                str(csr_path),
+            ])
+        self.assertEqual(result, 1)
+        self.assertIn("No existe el alias 'no-existe'", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+        self.assertFalse(csr_path.exists())
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_certreq_rejects_wrong_store_password_without_traceback(self):
+        self.assertEqual(self.generate()[0], 0)
+        csr_path = self.path.with_suffix(".csr")
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-certreq",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "miClave",
+                "-storepass",
+                "wrong-password",
+                "-file",
+                str(csr_path),
+            ])
+        self.assertEqual(result, 1)
+        self.assertIn("incorrecta", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+        self.assertFalse(csr_path.exists())
+
+    def test_certreq_rejects_wrong_alias_password_without_private_key_leak(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            generated = mykeytool.main([
+                "-genkeypair",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "miClave",
+                "-storepass",
+                self.password,
+                "-keypass",
+                "other-password-123",
+                "-keyalg",
+                "RSA",
+                "-keysize",
+                "2048",
+                "-dname",
+                "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES",
+            ])
+        self.assertEqual(generated, 0, errors.getvalue())
+
+        csr_path = self.path.with_suffix(".csr")
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-certreq",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "miClave",
+                "-storepass",
+                self.password,
+                "-keypass",
+                "wrong-key-password",
+                "-file",
+                str(csr_path),
+            ])
+        self.assertEqual(result, 1)
+        self.assertIn("alias 'miClave'", errors.getvalue())
+        self.assertNotIn("PRIVATE KEY", output.getvalue() + errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+        self.assertFalse(csr_path.exists())
+
+    def test_certreq_reports_missing_or_damaged_keystore(self):
+        csr_path = self.path.with_suffix(".csr")
+        for content, expected in [(None, "No existe"), (b"broken", "Formato")]:
+            with self.subTest(expected=expected):
+                if content is not None:
+                    self.path.write_bytes(content)
+                errors = io.StringIO()
+                with (
+                    contextlib.redirect_stdout(io.StringIO()),
+                    contextlib.redirect_stderr(errors),
+                ):
+                    result = mykeytool.main([
+                        "-certreq",
+                        "-keystore",
+                        str(self.path),
+                        "-alias",
+                        "miClave",
+                        "-storepass",
+                        self.password,
+                        "-file",
+                        str(csr_path),
+                    ])
+                self.assertEqual(result, 1)
+                self.assertIn(expected, errors.getvalue())
+                self.assertNotIn("Traceback", errors.getvalue())
+                self.assertFalse(csr_path.exists())
+
+    def test_shows_certreq_help(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main(["--certreq", "--help"])
+        self.assertEqual(result, 0)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("Optional for -certreq", errors.getvalue())
+        self.assertIn("-file FILE.csr", errors.getvalue())
 
 if __name__ == "__main__":
     unittest.main()

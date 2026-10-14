@@ -10,6 +10,7 @@ Crear un programa Python que permita:
 
 - Generar pares de claves pública/privada.
 - Almacenar claves con alias identificativos.
+- Generar solicitudes de firma de certificado (CSR) en formato PEM.
 - Consultar desde Python la información de una entrada del KeyStore.
 - Simular funcionalidades básicas de `keytool` en un entorno de consola.
 
@@ -49,6 +50,12 @@ py -3.14 -m venv .venv
 pip install -r requirements.txt
 ```
 
+La dependencia principal también puede instalarse directamente con:
+
+```bash
+pip install cryptography
+```
+
 Si ya tienes un entorno creado con MSYS2 o MinGW, recrealo con el Python oficial de Windows para poder instalar `cryptography` sin errores de compatibilidad.
 
 ## Dependencias
@@ -72,6 +79,28 @@ Pr-cticaKeytoolPython/
 └── .gitignore           # Archivos ignorados por Git
 ```
 
+### Explicación sencilla de la arquitectura
+
+El programa está separado por responsabilidades para que el flujo sea fácil de
+seguir y cada archivo tenga una única función:
+
+1. `mykeytool.py` actúa como fachada: interpreta los argumentos, comprueba la
+   dependencia criptográfica y decide qué comando ejecutar.
+2. `genkeypair.py` recoge los datos, genera el par RSA y prepara la entrada.
+3. `certreq.py` recupera una entrada existente, firma el CSR y exporta el PEM.
+4. `keystore.py` cifra, valida, lee y escribe el almacén.
+
+El recorrido de `--certreq` se puede explicar en tres pasos:
+
+```text
+contraseña + alias → entrada cifrada → CSR firmado → archivo .csr PEM
+```
+
+Hay dos contraseñas con objetivos distintos: `storepass` permite descifrar el
+almacén completo y `keypass` permite usar la clave privada de un alias. La clave
+privada solo se mantiene en memoria el tiempo necesario para firmar y nunca se
+escribe en el CSR.
+
 ## Uso previsto
 
 Si ejecutas el programa sin parametros, muestra solo los comandos disponibles:
@@ -87,11 +116,18 @@ python mykeytool.py -genkeypair -h
 python mykeytool.py -genkeypair --help
 ```
 
+La ayuda específica de `certreq` muestra sus opciones compatibles con el estilo de
+`keytool`:
+
+```bash
+python mykeytool.py -certreq --help
+```
+
 El flujo mas simple para generar un par de claves es:
 
 ```bash
 python mykeytool.py --genkeypair -keyalg RSA
-python mykeytool.py --certreq
+python mykeytool.py --certreq -keystore keystore.myks
 ```
 
 Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
@@ -100,10 +136,30 @@ Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
 python mykeytool.py -genkeypair -alias mykey -keyalg RSA -keysize 2048 -dname "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES"
 ```
 
+Para generar un CSR a partir de una entrada existente:
+
+```bash
+python mykeytool.py -certreq -keystore keystore.myks -alias mykey -file mykey.csr
+```
+
+Si se omiten `-storepass`, `-alias` o `-keypass`, el programa los solicita de
+forma interactiva. Al pulsar Enter en la contraseña de la clave se reutiliza la
+del KeyStore. Si se omite `-file`, la salida se llama `<alias>.csr`.
+
+El CSR se firma con SHA-256 y la clave privada RSA del alias. Contiene el DN y la
+clave pública, pero nunca incluye la clave privada. La contraseña del KeyStore,
+la contraseña de la clave, un alias inexistente y un almacén inexistente o dañado
+se notifican como errores controlados, sin mostrar una traza.
+
+La contraseña del KeyStore dispone de un único intento por ejecución, tanto en
+`genkeypair` como en `certreq`. Si es incorrecta, el programa termina con un error
+controlado y es necesario ejecutar de nuevo el comando.
+
 `--genkeypair` y `-genkeypair` aceptan parametros estilo `keytool`, pero tambien completan por consola los que falten. En el flujo interactivo actual se solicitan, segun falten:
 
 - `keyalg`
-- `keysize` con valor por defecto `2048`
+- `keysize` con valor por defecto `2048`; admite `2048`, `3072`, `4096`, `7680`
+  y `15360`, y muestra estas opciones en el prompt
 - contrasena del KeyStore
 - contrasena de la clave (`RETURN` reutiliza la del KeyStore)
 - alias con valor por defecto `mykey`
@@ -115,7 +171,7 @@ Ejemplo de flujo interactivo:
 
 ```text
 > python mykeytool.py -genkeypair -keyalg RSA
-Enter key size [2048]:
+Enter key size (2048, 3072, 4096, 7680, 15360) [2048]:
 Enter keystore password:
 Re-enter new password:
 Enter key alias [mykey]:
@@ -137,7 +193,7 @@ Is CN=Ana Perez, OU=Seguridad, O=Empresa, L=Madrid, ST=Madrid, C=ES correct? [no
 Exito: par RSA de 2048 bits guardado con alias 'mykey' en 'keystore.myks'.
 ```
 
-La clave privada se guarda cifrada con `keypass`. Si `python` apunta a un interprete sin `cryptography`, el script intentara reejecutarse automaticamente con `.venv`. `--certreq` sigue siendo un marcador para la siguiente fase del proyecto.
+La clave privada se guarda cifrada con `keypass`. Si `python` apunta a un interprete sin `cryptography`, el script intentara reejecutarse automaticamente con `.venv`.
 
 ### Formato y recuperación del KeyStore
 
@@ -181,6 +237,23 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 
 ```powershell
 .\.venv\Scripts\python.exe .\mykeytool.py --genkeypair -keyalg RSA
+```
+
+## Matriz de pruebas ejecutadas
+
+| Área | Verificación automatizada | Resultado esperado |
+|---|---|---|
+| `genkeypair` | RSA 2048/3072/4096, DN, alias duplicado y persistencia cifrada | La entrada se crea sin exponer secretos |
+| KeyStore | Contraseña correcta/incorrecta, formato inválido, manipulación y archivo inexistente | Acceso autenticado o error controlado |
+| `certreq` | CSR PEM, firma SHA-256, sujeto DN y coincidencia de clave pública | CSR válido y firmado por la clave del alias |
+| Privacidad | Inspección del PEM y de los mensajes de consola | No aparece ninguna clave privada ni contraseña |
+| Errores de CSR | Alias inexistente, contraseña de almacén/clave incorrecta y almacén dañado | Código de salida 1, sin traceback ni archivo parcial |
+| CLI | Ayuda general y ayuda específica de ambos comandos | Opciones y sintaxis visibles |
+
+La suite completa se ejecuta con:
+
+```bash
+python -m unittest discover -s tests -v
 ```
 
 ## Nota

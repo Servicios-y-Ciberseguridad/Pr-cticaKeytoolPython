@@ -115,8 +115,25 @@ def load_keystore_entry(path: Path, alias: str, password: str) -> KeyEntry:
         raise ValueError(f"No existe el alias '{normalized_alias}' en el KeyStore.") from exc
 
 
+def write_bytes_atomic(path: Path, data: bytes) -> None:
+    """Escribe bytes completos y reemplaza el destino solo al terminar."""
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(data)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def save_keystore(path: Path, password: str, entries: dict[str, KeyEntry]) -> None:
-    """Write a version-1 keystore: header, salt, nonce, then AES-GCM ciphertext."""
+    """Cifra y guarda el KeyStore en su formato binario versionado."""
     ensure_crypto_available()
     salt = os.urandom(STORE_SALT_SIZE)
     nonce = os.urandom(STORE_NONCE_SIZE)
@@ -124,20 +141,4 @@ def save_keystore(path: Path, password: str, entries: dict[str, KeyEntry]) -> No
     ciphertext = AESGCM(derive_store_key(password, salt)).encrypt(
         nonce, plaintext, STORE_HEADER
     )
-
-    with tempfile.NamedTemporaryFile(
-        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
-    ) as temporary:
-        temporary_path = Path(temporary.name)
-        try:
-            temporary.write(STORE_HEADER + salt + nonce + ciphertext)
-            temporary.flush()
-            os.fsync(temporary.fileno())
-        except OSError:
-            temporary.close()
-            temporary_path.unlink()
-            raise
-    try:
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
+    write_bytes_atomic(path, STORE_HEADER + salt + nonce + ciphertext)

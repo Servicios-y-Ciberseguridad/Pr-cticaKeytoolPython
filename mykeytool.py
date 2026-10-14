@@ -92,7 +92,7 @@ def print_genkeypair_help() -> None:
 def print_certreq_help() -> None:
     print(
         "usage: mykeytool.py -certreq [-keystore KEYSTORE] [-alias ALIAS] "
-        "[-storepass STOREPASS] [-keypass KEYPASS] [-file FILE.csr]",
+        "[-storepass STOREPASS] [-keypass KEYPASS] [-file FILE]",
         file=sys.stderr,
     )
     print("", file=sys.stderr)
@@ -101,7 +101,7 @@ def print_certreq_help() -> None:
     print("  -alias ALIAS", file=sys.stderr)
     print("  -storepass STOREPASS", file=sys.stderr)
     print("  -keypass KEYPASS", file=sys.stderr)
-    print("  -file FILE.csr    archivo CSR PEM (por defecto: <alias>.csr)", file=sys.stderr)
+    print("  -file FILE        archivo .csr o .pem (por defecto: <alias>.csr)", file=sys.stderr)
 
 
 def print_main_help() -> None:
@@ -164,7 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-file",
         "--file",
         type=Path,
-        help="archivo .csr de salida para -certreq",
+        help="archivo .csr o .pem de salida para -certreq",
     )
     return parser
 

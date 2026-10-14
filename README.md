@@ -144,10 +144,15 @@ python mykeytool.py -certreq -keystore keystore.myks -alias mykey -file mykey.cs
 
 Si se omiten `-storepass`, `-alias` o `-keypass`, el programa los solicita de
 forma interactiva. Al pulsar Enter en la contraseña de la clave se reutiliza la
-del KeyStore. Si se omite `-file`, la salida se llama `<alias>.csr`.
+del KeyStore. `-file` admite las extensiones `.csr` y `.pem`; si se omite, la
+salida se llama `<alias>.csr`.
 
-El CSR se firma con SHA-256 y la clave privada RSA del alias. Contiene el DN y la
-clave pública, pero nunca incluye la clave privada. La contraseña del KeyStore,
+El CSR se firma con SHA-256 y la clave privada RSA del alias. Se exporta como
+PKCS#10 en Base64 PEM compatible con `keytool -certreq -rfc`, con las cabeceras
+`BEGIN NEW CERTIFICATE REQUEST` y `END NEW CERTIFICATE REQUEST`. El relleno final
+`=` o `==` aparece solamente cuando corresponde a la longitud de los datos
+binarios. Contiene el DN y la clave pública, pero nunca incluye la clave privada.
+La contraseña del KeyStore,
 la contraseña de la clave, un alias inexistente y un almacén inexistente o dañado
 se notifican como errores controlados, sin mostrar una traza.
 

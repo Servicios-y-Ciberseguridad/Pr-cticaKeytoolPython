@@ -1,0 +1,5 @@
+Use 'raise ErrorType("Error.") from err' during exception handling.
+- Why? To print the exception and throw a new one to link where it has happened.
+- Note: 'raise ErrorType("Error.") from variable_name;' is the same, chaining the variable value as what happened.
+
+Keep buildParser() as it is a python build-in library specific for command inputs.

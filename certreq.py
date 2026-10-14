@@ -8,6 +8,13 @@ import re
 import sys
 from pathlib import Path
 
+from errors import (
+    AliasNotFoundError,
+    KeyPasswordError,
+    KeytoolError,
+    KeystoreNotFoundError,
+)
+
 try:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
@@ -63,7 +70,7 @@ def open_existing_keystore(
 ) -> tuple[str, dict[str, KeyEntry]]:
     """Abre el KeyStore con un unico intento de contrasena."""
     if not path.exists():
-        raise FileNotFoundError(f"No existe el KeyStore: '{path}'.")
+        raise KeystoreNotFoundError(f"No existe el KeyStore: '{path}'.")
 
     password = resolve_store_password(storepass)
     return password, load_keystore(path, password)
@@ -93,7 +100,7 @@ def load_private_key(
             password=password.encode("utf-8"),
         )
     except (TypeError, ValueError) as exc:
-        raise ValueError(
+        raise KeyPasswordError(
             f"Contrasena incorrecta para la clave del alias '{alias}'."
         ) from exc
 
@@ -164,7 +171,7 @@ def handle_certreq(
         try:
             entry = entries[resolved_alias]
         except KeyError as exc:
-            raise ValueError(
+            raise AliasNotFoundError(
                 f"No existe el alias '{resolved_alias}' en el KeyStore."
             ) from exc
 
@@ -193,7 +200,7 @@ def handle_certreq(
             file=sys.stderr,
         )
         return 1
-    except (OSError, TypeError, ValueError) as exc:
+    except (KeytoolError, OSError, TypeError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     except (EOFError, KeyboardInterrupt):

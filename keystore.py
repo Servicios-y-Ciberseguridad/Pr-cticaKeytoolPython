@@ -8,6 +8,13 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict
 
+from errors import (
+    AliasNotFoundError,
+    InvalidKeystoreError,
+    KeystoreAuthenticationError,
+    KeystoreNotFoundError,
+)
+
 try:
     from cryptography.exceptions import InvalidTag
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -55,12 +62,12 @@ def load_keystore(path: Path, password: str) -> dict[str, KeyEntry]:
     try:
         data = path.read_bytes()
     except FileNotFoundError as exc:
-        raise FileNotFoundError(f"No existe el KeyStore: '{path}'.") from exc
+        raise KeystoreNotFoundError(f"No existe el KeyStore: '{path}'.") from exc
 
     offset = len(STORE_HEADER)
     minimum_size = offset + STORE_SALT_SIZE + STORE_NONCE_SIZE + AES_GCM_TAG_SIZE
     if not data.startswith(STORE_HEADER) or len(data) < minimum_size:
-        raise ValueError("Formato de KeyStore no valido.")
+        raise InvalidKeystoreError("Formato de KeyStore no valido.")
 
     salt_start = offset
     nonce_start = salt_start + STORE_SALT_SIZE
@@ -72,14 +79,16 @@ def load_keystore(path: Path, password: str) -> dict[str, KeyEntry]:
             nonce, data[ciphertext_start:], STORE_HEADER
         )
     except InvalidTag as exc:
-        raise ValueError("Contrasena incorrecta o KeyStore alterado.") from exc
+        raise KeystoreAuthenticationError(
+            "Contrasena incorrecta o KeyStore alterado."
+        ) from exc
 
     try:
         entries = json.loads(plaintext.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Contenido de KeyStore no valido.") from exc
+        raise InvalidKeystoreError("Contenido de KeyStore no valido.") from exc
     if not isinstance(entries, dict):
-        raise ValueError("Contenido de KeyStore no valido.")
+        raise InvalidKeystoreError("Contenido de KeyStore no valido.")
 
     store: dict[str, KeyEntry] = {}
     for alias, entry in entries.items():
@@ -91,12 +100,12 @@ def load_keystore(path: Path, password: str) -> dict[str, KeyEntry]:
             or not isinstance(entry.get("public_key"), str)
             or not isinstance(entry.get("dn"), dict)
         ):
-            raise ValueError("Entrada de KeyStore no valida.")
+            raise InvalidKeystoreError("Entrada de KeyStore no valida.")
         dn = entry["dn"]
         if set(dn) != set(DN_FIELDS) or any(
             not isinstance(value, str) or not value.strip() for value in dn.values()
         ):
-            raise ValueError("DN de KeyStore no valido.")
+            raise InvalidKeystoreError("DN de KeyStore no valido.")
         store[alias] = KeyEntry(
             private_key=entry["private_key"], public_key=entry["public_key"], dn=dn
         )
@@ -112,7 +121,9 @@ def load_keystore_entry(path: Path, alias: str, password: str) -> KeyEntry:
     try:
         return entries[normalized_alias]
     except KeyError as exc:
-        raise ValueError(f"No existe el alias '{normalized_alias}' en el KeyStore.") from exc
+        raise AliasNotFoundError(
+            f"No existe el alias '{normalized_alias}' en el KeyStore."
+        ) from exc
 
 
 def write_bytes_atomic(path: Path, data: bytes) -> None:

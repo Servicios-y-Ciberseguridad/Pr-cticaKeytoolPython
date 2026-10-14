@@ -7,6 +7,8 @@ import sys
 import warnings
 from pathlib import Path
 
+from errors import DuplicateAliasError, KeytoolError
+
 try:
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
@@ -200,7 +202,7 @@ def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str
     if alias is not None:
         resolved = resolve_alias(alias)
         if resolved in entries:
-            raise ValueError(f"El alias '{resolved}' ya existe.")
+            raise DuplicateAliasError(f"El alias '{resolved}' ya existe.")
         return resolved
     last_alias = ""
     for attempt in range(1, MAX_ALIAS_ATTEMPTS + 1):
@@ -210,12 +212,14 @@ def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str
             return resolved
         remaining_attempts = MAX_ALIAS_ATTEMPTS - attempt
         if remaining_attempts == 0:
-            raise ValueError(f"El alias '{resolved}' ya existe. Se agotaron los 3 intentos.")
+            raise DuplicateAliasError(
+                f"El alias '{resolved}' ya existe. Se agotaron los 3 intentos."
+            )
         print(
             f"Error: El alias '{resolved}' ya existe. Intentos restantes: {remaining_attempts}.",
             file=sys.stderr,
         )
-    raise ValueError(f"El alias '{last_alias}' ya existe.")
+    raise DuplicateAliasError(f"El alias '{last_alias}' ya existe.")
 
 
 def handle_genkeypair(
@@ -259,7 +263,7 @@ def handle_genkeypair(
             file=sys.stderr,
         )
         return 1
-    except (OSError, ValueError) as exc:
+    except (KeytoolError, OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     except (EOFError, KeyboardInterrupt):

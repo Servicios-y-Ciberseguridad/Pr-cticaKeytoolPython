@@ -156,6 +156,13 @@ La contraseña del KeyStore,
 la contraseña de la clave, un alias inexistente y un almacén inexistente o dañado
 se notifican como errores controlados, sin mostrar una traza.
 
+Los errores esperados tienen clases específicas derivadas de `KeytoolError`
+(`KeystoreAuthenticationError`, `KeyPasswordError`, `DuplicateAliasError`,
+`KeystoreNotFoundError`, `InvalidKeystoreError` y `AliasNotFoundError`).
+Cuando la autenticación criptográfica falla, el programa indica que la contraseña
+puede ser incorrecta o que el almacén pudo ser alterado, ya que ambas causas no se
+pueden distinguir de forma fiable.
+
 La contraseña del KeyStore dispone de un único intento por ejecución, tanto en
 `genkeypair` como en `certreq`. Si es incorrecta, el programa termina con un error
 controlado y es necesario ejecutar de nuevo el comando.

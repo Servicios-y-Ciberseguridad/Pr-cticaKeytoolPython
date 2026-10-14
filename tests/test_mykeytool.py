@@ -14,7 +14,15 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.x509.oid import NameOID
 
 import mykeytool
-from certreq import resolve_output_path
+from errors import (
+    AliasNotFoundError,
+    DuplicateAliasError,
+    InvalidKeystoreError,
+    KeyPasswordError,
+    KeystoreAuthenticationError,
+    KeystoreNotFoundError,
+)
+from certreq import load_private_key, resolve_output_path
 
 
 class GenKeyPairTests(unittest.TestCase):
@@ -75,7 +83,7 @@ class GenKeyPairTests(unittest.TestCase):
         encrypted = self.path.read_bytes()
         for secret in (b"miClave", b"PRIVATE KEY", b"Empresa", self.password.encode()):
             self.assertNotIn(secret, encrypted)
-        with self.assertRaisesRegex(ValueError, "incorrecta"):
+        with self.assertRaisesRegex(KeystoreAuthenticationError, "incorrecta"):
             mykeytool.load_keystore(self.path, "wrong-password")
 
     def test_loads_one_entry_by_alias_and_store_password(self):
@@ -86,13 +94,13 @@ class GenKeyPairTests(unittest.TestCase):
         )
 
         self.assertEqual(entry["dn"]["CN"], "Ana")
-        with self.assertRaisesRegex(ValueError, "No existe el alias"):
+        with self.assertRaisesRegex(AliasNotFoundError, "No existe el alias"):
             mykeytool.load_keystore_entry(self.path, "missing", self.password)
-        with self.assertRaisesRegex(ValueError, "incorrecta"):
+        with self.assertRaisesRegex(KeystoreAuthenticationError, "incorrecta"):
             mykeytool.load_keystore_entry(self.path, "miClave", "wrong-password")
 
     def test_missing_keystore_is_reported(self):
-        with self.assertRaisesRegex(FileNotFoundError, "No existe el KeyStore"):
+        with self.assertRaisesRegex(KeystoreNotFoundError, "No existe el KeyStore"):
             mykeytool.load_keystore(self.path, self.password)
 
     def test_save_load_round_trip_uses_versioned_encrypted_format(self):
@@ -131,7 +139,7 @@ class GenKeyPairTests(unittest.TestCase):
             mykeytool.STORE_HEADER + salt + nonce + ciphertext
         )
 
-        with self.assertRaisesRegex(ValueError, "Contenido de KeyStore no valido"):
+        with self.assertRaisesRegex(InvalidKeystoreError, "Contenido de KeyStore no valido"):
             mykeytool.load_keystore(self.path, self.password)
 
     def test_supports_keytool_style_arguments(self):
@@ -440,11 +448,15 @@ class GenKeyPairTests(unittest.TestCase):
     def test_duplicate_alias_and_wrong_password_preserve_file(self):
         self.assertEqual(self.generate()[0], 0)
         before = self.path.read_bytes()
+        entries = mykeytool.load_keystore(self.path, self.password)
+        with self.assertRaisesRegex(DuplicateAliasError, "ya existe"):
+            mykeytool.resolve_unique_alias("miClave", entries)
         for kwargs, message in [({}, "ya existe"), ({"password": "wrong-password"}, "incorrecta")]:
             result, output, errors = self.generate(**kwargs)
             self.assertEqual(result, 1)
             self.assertNotIn("Exito", output)
             self.assertIn(message, errors)
+            self.assertNotIn("Traceback", errors)
             self.assertEqual(self.path.read_bytes(), before)
 
     def test_genkeypair_fails_after_one_wrong_store_password(self):
@@ -473,6 +485,7 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertEqual(getpass_mock.call_count, 1)
         self.assertIn("incorrecta", errors.getvalue())
         self.assertNotIn("Intentos restantes", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
         self.assertEqual(self.path.read_bytes(), before)
 
     def test_duplicate_alias_allows_three_interactive_attempts(self):
@@ -534,6 +547,7 @@ class GenKeyPairTests(unittest.TestCase):
             ])
         self.assertEqual(result, 1)
         self.assertIn("Se agotaron los 3 intentos", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
         self.assertEqual(self.path.read_bytes(), before)
 
     def test_tampered_or_invalid_store_is_not_overwritten(self):
@@ -542,7 +556,9 @@ class GenKeyPairTests(unittest.TestCase):
         tampered = data[:-1] + bytes([data[-1] ^ 1])
         for invalid in (tampered, b"", b"not-a-keystore"):
             self.path.write_bytes(invalid)
-            self.assertEqual(self.generate()[0], 1)
+            result, output, errors = self.generate()
+            self.assertEqual(result, 1)
+            self.assertNotIn("Traceback", errors)
             self.assertEqual(self.path.read_bytes(), invalid)
 
     def test_empty_fields_and_invalid_country_fail(self):
@@ -953,6 +969,11 @@ class GenKeyPairTests(unittest.TestCase):
                 "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES",
             ])
         self.assertEqual(generated, 0, errors.getvalue())
+        entry = mykeytool.load_keystore(self.path, self.password)["miClave"]
+        with self.assertRaisesRegex(KeyPasswordError, "Contrasena incorrecta"):
+            load_private_key(
+                entry, "miClave", self.password, "wrong-key-password"
+            )
 
         csr_path = self.path.with_suffix(".csr")
         output = io.StringIO()

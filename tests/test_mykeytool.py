@@ -86,6 +86,32 @@ class GenKeyPairTests(unittest.TestCase):
         with self.assertRaisesRegex(FileNotFoundError, "No existe el KeyStore"):
             mykeytool.load_keystore(self.path, self.password)
 
+    def test_save_load_round_trip_uses_versioned_encrypted_format(self):
+        entries = {
+            "private-alias": mykeytool.KeyEntry(
+                private_key="private-key-secret",
+                public_key="public-key-data",
+                dn={field: f"{field}-value" for field in mykeytool.DN_FIELDS},
+            )
+        }
+
+        mykeytool.save_keystore(self.path, self.password, entries)
+
+        data = self.path.read_bytes()
+        encrypted_data_start = (
+            len(mykeytool.STORE_HEADER)
+            + mykeytool.STORE_SALT_SIZE
+            + mykeytool.STORE_NONCE_SIZE
+        )
+        self.assertTrue(data.startswith(mykeytool.STORE_HEADER))
+        self.assertGreaterEqual(
+            len(data),
+            encrypted_data_start + mykeytool.AES_GCM_TAG_SIZE,
+        )
+        for secret in (b"private-alias", b"private-key-secret", self.password.encode()):
+            self.assertNotIn(secret, data)
+        self.assertEqual(mykeytool.load_keystore(self.path, self.password), entries)
+
     def test_authenticated_invalid_json_is_reported_as_invalid_store(self):
         salt = bytes(mykeytool.STORE_SALT_SIZE)
         nonce = bytes(mykeytool.STORE_NONCE_SIZE)
@@ -638,7 +664,10 @@ class GenKeyPairTests(unittest.TestCase):
     def test_short_or_mismatched_password_fails(self):
         self.assertEqual(self.generate(password="short")[0], 1)
         with (
-            patch("mykeytool.getpass.getpass", side_effect=[self.password, "different"]),
+            patch(
+                "mykeytool.getpass.getpass",
+                side_effect=[self.password, "different"] * mykeytool.MAX_PASSWORD_ATTEMPTS,
+            ),
             contextlib.redirect_stderr(io.StringIO()) as errors,
         ):
             self.assertEqual(mykeytool.handle_genkeypair(self.path, keyalg="RSA", keysize=2048), 1)

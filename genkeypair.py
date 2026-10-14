@@ -24,8 +24,9 @@ from keystore import (
     save_keystore,
 )
 
-MAX_PASSWORD_ATTEMPTS = 3
+MAX_PASSWORD_ATTEMPTS = 1
 MAX_ALIAS_ATTEMPTS = 3
+SUPPORTED_KEY_SIZES = (2048, 3072, 4096, 7680, 15360)
 
 
 def read_password(prompt: str) -> str:
@@ -42,22 +43,45 @@ def read_required(prompt: str) -> str:
 
 
 def resolve_key_algorithm(keyalg: str | None) -> str:
-    value = keyalg.strip() if keyalg is not None else read_required("Enter key algorithm: ")
-    algorithm = value.upper()
-    if algorithm != "RSA":
-        raise ValueError("Solo se admite -keyalg RSA en esta implementacion.")
-    return algorithm
+    """Valida RSA; en modo interactivo vuelve a preguntar si es necesario."""
+    if keyalg is not None:
+        algorithm = keyalg.strip().upper()
+        if algorithm != "RSA":
+            raise ValueError("Solo se admite -keyalg RSA en esta implementacion.")
+        return algorithm
+
+    while True:
+        algorithm = read_required("Enter key algorithm: ").upper()
+        if algorithm == "RSA":
+            return algorithm
+        print("Error: algoritmo no valido; solo se admite RSA.", file=sys.stderr)
+
+
+def is_key_size_supported(keysize: int) -> bool:
+    """Indica si el tamano RSA pertenece a la lista admitida."""
+    return keysize in SUPPORTED_KEY_SIZES
 
 
 def resolve_key_size(keysize: int | None) -> int:
     if keysize is not None:
-        resolved = keysize
-    else:
-        entered = input("Enter key size [2048]: ").strip()
-        resolved = 2048 if entered == "" else int(entered)
-    if resolved < 1024:
-        raise ValueError("-keysize debe ser un entero de al menos 1024 bits.")
-    return resolved
+        if not is_key_size_supported(keysize):
+            allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
+            raise ValueError(f"-keysize debe ser uno de estos valores: {allowed}.")
+        return keysize
+
+    while True:
+        allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
+        entered = input(f"Enter key size ({allowed}) [2048]: ").strip()
+        try:
+            resolved = 2048 if entered == "" else int(entered)
+        except ValueError:
+            resolved = 0
+        if is_key_size_supported(resolved):
+            return resolved
+        print(
+            f"Error: tamano no valido; valores admitidos: {allowed}.",
+            file=sys.stderr,
+        )
 
 
 def parse_dname(dname: str) -> dict[str, str]:
@@ -134,53 +158,12 @@ def read_store_password(path: Path, storepass: str | None) -> str:
 def open_keystore_with_password(
     path: Path, storepass: str | None
 ) -> tuple[str, dict[str, KeyEntry]]:
+    """Abre o crea el KeyStore con un unico intento por ejecucion."""
     if not path.exists():
-        if storepass is not None:
-            return read_store_password(path, storepass), {}
-        last_error: ValueError | None = None
-        for attempt in range(1, MAX_PASSWORD_ATTEMPTS + 1):
-            try:
-                return read_store_password(path, None), {}
-            except ValueError as exc:
-                last_error = exc
-                if str(exc) not in {
-                    "La contrasena debe tener al menos 8 caracteres.",
-                    "Las contrasenas no coinciden.",
-                }:
-                    raise
-                remaining_attempts = MAX_PASSWORD_ATTEMPTS - attempt
-                if remaining_attempts == 0:
-                    raise ValueError(f"{exc} Se agotaron los 3 intentos.") from exc
-                print(
-                    f"Error: {exc} Intentos restantes: {remaining_attempts}.",
-                    file=sys.stderr,
-                )
-        assert last_error is not None
-        raise last_error
+        return read_store_password(path, storepass), {}
 
-    if storepass is not None:
-        password = read_store_password(path, storepass)
-        return password, load_keystore(path, password)
-    last_error = None
-    for attempt in range(1, MAX_PASSWORD_ATTEMPTS + 1):
-        password = read_store_password(path, None)
-        try:
-            return password, load_keystore(path, password)
-        except ValueError as exc:
-            last_error = exc
-            if str(exc) != "Contrasena incorrecta o KeyStore alterado.":
-                raise
-            remaining_attempts = MAX_PASSWORD_ATTEMPTS - attempt
-            if remaining_attempts == 0:
-                raise ValueError(
-                    "Contrasena incorrecta o KeyStore alterado. Se agotaron los 3 intentos."
-                ) from exc
-            print(
-                f"Error: contrasena incorrecta. Intentos restantes: {remaining_attempts}.",
-                file=sys.stderr,
-            )
-    assert last_error is not None
-    raise last_error
+    password = read_store_password(path, storepass)
+    return password, load_keystore(path, password)
 
 
 def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str:

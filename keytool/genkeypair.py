@@ -7,7 +7,7 @@ import sys
 import warnings
 from pathlib import Path
 
-from errors import DuplicateAliasError, KeytoolError
+from .errors import DuplicateAliasError, KeytoolError
 
 try:
     from cryptography.hazmat.primitives import serialization
@@ -16,7 +16,7 @@ except ModuleNotFoundError:
     serialization = None
     rsa = None
 
-from keystore import (
+from .keystore import (
     DEFAULT_KEYSTORE,
     DN_FIELDS,
     UNKNOWN_DN_VALUE,

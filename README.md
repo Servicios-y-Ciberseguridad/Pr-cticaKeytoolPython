@@ -66,10 +66,16 @@ Este proyecto usa la librería `cryptography`, que permite generar claves, certi
 
 ```text
 Pr-cticaKeytoolPython/
-├── mykeytool.py          # CLI y enrutamiento de comandos
-├── genkeypair.py         # Generacion RSA y flujo interactivo
-├── keystore.py           # Cifrado, lectura y escritura del KeyStore
-├── certreq.py            # Comando de solicitudes CSR
+├── mykeytool.py          # Punto de entrada compatible
+├── keytool/              # Paquete de la aplicación
+│   ├── __init__.py
+│   ├── __main__.py       # Permite ejecutar python -m keytool
+│   ├── mykeytool.py      # CLI y enrutamiento de comandos
+│   ├── genkeypair.py     # Generacion RSA y flujo interactivo
+│   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
+│   ├── certreq.py        # Comando de solicitudes CSR
+│   ├── changealias.py    # Cambio de alias de una entrada
+│   └── errors.py         # Errores de dominio
 ├── tests/
 │   └── test_mykeytool.py
 ├── README.md             # Documentación del proyecto
@@ -81,14 +87,18 @@ Pr-cticaKeytoolPython/
 
 ### Explicación sencilla de la arquitectura
 
-El programa está separado por responsabilidades para que el flujo sea fácil de
-seguir y cada archivo tenga una única función:
+El código de la aplicación se agrupa en el paquete `keytool/` y las pruebas
+permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 
-1. `mykeytool.py` actúa como fachada: interpreta los argumentos, comprueba la
-   dependencia criptográfica y decide qué comando ejecutar.
-2. `genkeypair.py` recoge los datos, genera el par RSA y prepara la entrada.
-3. `certreq.py` recupera una entrada existente, firma el CSR y exporta el PEM.
-4. `keystore.py` cifra, valida, lee y escribe el almacén.
+1. `keytool/mykeytool.py` interpreta argumentos y enruta los comandos.
+2. `keytool/genkeypair.py` recoge los datos, genera el par RSA y prepara la entrada.
+3. `keytool/certreq.py` recupera una entrada existente, firma el CSR y exporta el PEM.
+4. `keytool/changealias.py` valida las entradas y solicita renombrar un alias.
+5. `keytool/keystore.py` cifra, valida, lee y escribe el almacén.
+6. `keytool/errors.py` define los errores de dominio compartidos.
+
+El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
+puedes iniciar la aplicación mediante `python -m keytool`.
 
 El recorrido de `--certreq` se puede explicar en tres pasos:
 
@@ -128,7 +138,14 @@ El flujo mas simple para generar un par de claves es:
 ```bash
 python mykeytool.py --genkeypair -keyalg RSA
 python mykeytool.py --certreq -keystore keystore.myks
+python mykeytool.py --changealias -keystore keystore.myks -alias mykey -destalias nuevaClave
 ```
+
+`-changealias` también admite `--changealias`. Si se omiten `-storepass`,
+`-alias` o `-destalias`, los solicita de forma interactiva; la contraseña se
+solicita sin eco. El cambio conserva todos los datos de la entrada, incluida la
+clave privada en su forma cifrada y cualquier certificado asociado, sin pedir ni
+descifrar la contraseña de la clave privada.
 
 Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
 

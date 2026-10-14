@@ -6,10 +6,11 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
-from errors import (
+from .errors import (
     AliasNotFoundError,
+    DuplicateAliasError,
     InvalidKeystoreError,
     KeystoreAuthenticationError,
     KeystoreNotFoundError,
@@ -106,9 +107,7 @@ def load_keystore(path: Path, password: str) -> dict[str, KeyEntry]:
             not isinstance(value, str) or not value.strip() for value in dn.values()
         ):
             raise InvalidKeystoreError("DN de KeyStore no valido.")
-        store[alias] = KeyEntry(
-            private_key=entry["private_key"], public_key=entry["public_key"], dn=dn
-        )
+        store[alias] = cast(KeyEntry, entry)
     return store
 
 
@@ -124,6 +123,32 @@ def load_keystore_entry(path: Path, alias: str, password: str) -> KeyEntry:
         raise AliasNotFoundError(
             f"No existe el alias '{normalized_alias}' en el KeyStore."
         ) from exc
+
+
+def change_keystore_alias(
+    path: Path, password: str, alias: str, destalias: str
+) -> None:
+    """Renombra una entrada sin descifrar su clave privada."""
+    source_alias = alias.strip()
+    destination_alias = destalias.strip()
+    if not source_alias:
+        raise ValueError("El alias actual no puede estar vacio.")
+    if not destination_alias:
+        raise ValueError("El alias de destino no puede estar vacio.")
+
+    entries = load_keystore(path, password)
+    try:
+        entry = entries[source_alias]
+    except KeyError as exc:
+        raise AliasNotFoundError(
+            f"No existe el alias '{source_alias}' en el KeyStore."
+        ) from exc
+    if destination_alias in entries:
+        raise DuplicateAliasError(f"El alias '{destination_alias}' ya existe.")
+
+    del entries[source_alias]
+    entries[destination_alias] = entry
+    save_keystore(path, password, entries)
 
 
 def write_bytes_atomic(path: Path, data: bytes) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import getpass
 import re
 import sys
@@ -41,6 +42,10 @@ DN_OIDS = {
     "ST": "STATE_OR_PROVINCE_NAME",
     "C": "COUNTRY_NAME",
 }
+
+KEYTOOL_PEM_HEADER = b"-----BEGIN NEW CERTIFICATE REQUEST-----"
+KEYTOOL_PEM_FOOTER = b"-----END NEW CERTIFICATE REQUEST-----"
+PEM_LINE_LENGTH = 64
 
 
 def resolve_store_password(storepass: str | None) -> str:
@@ -110,12 +115,14 @@ def build_subject(dn: dict[str, str]):
 
 
 def resolve_output_path(output: Path | None, alias: str) -> Path:
-    """Devuelve el -file indicado o crea un nombre seguro desde el alias."""
+    """Acepta una salida .csr/.pem o crea un nombre seguro desde el alias."""
     if output is None:
         safe_alias = re.sub(r"[^A-Za-z0-9._-]+", "_", alias).strip("._")
         output = Path(f"{safe_alias or 'request'}.csr")
-    if output.suffix.lower() != ".csr":
-        raise ValueError("El archivo indicado con -file debe tener extension .csr.")
+    if output.suffix.lower() not in {".csr", ".pem"}:
+        raise ValueError(
+            "El archivo indicado con -file debe tener extension .csr o .pem."
+        )
     return output
 
 
@@ -126,6 +133,17 @@ def ensure_key_pair_matches(private_key, entry: KeyEntry, alias: str) -> None:
         raise ValueError(f"La clave publica del alias '{alias}' no es RSA.")
     if private_key.public_key().public_numbers() != public_key.public_numbers():
         raise ValueError(f"Las claves del alias '{alias}' no coinciden.")
+
+
+def encode_keytool_pem(csr) -> bytes:
+    """Codifica un CSR como el PEM RFC mostrado por Java keytool."""
+    der = csr.public_bytes(serialization.Encoding.DER)
+    encoded = base64.b64encode(der)
+    lines = [
+        encoded[index : index + PEM_LINE_LENGTH]
+        for index in range(0, len(encoded), PEM_LINE_LENGTH)
+    ]
+    return b"\n".join([KEYTOOL_PEM_HEADER, *lines, KEYTOOL_PEM_FOOTER, b""])
 
 
 def handle_certreq(
@@ -167,7 +185,7 @@ def handle_certreq(
             raise ValueError("El archivo CSR no puede sobrescribir el KeyStore.")
         write_bytes_atomic(
             output_path,
-            csr.public_bytes(serialization.Encoding.PEM),
+            encode_keytool_pem(csr),
         )
     except getpass.GetPassWarning:
         print(
@@ -184,6 +202,6 @@ def handle_certreq(
 
     print(
         f"Exito: CSR del alias '{resolved_alias}' guardado en '{output_path}' "
-        "en formato PEM."
+        "en formato PEM compatible con keytool."
     )
     return 0

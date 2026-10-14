@@ -8,7 +8,7 @@ import re
 import sys
 from pathlib import Path
 
-from errors import (
+from .errors import (
     AliasNotFoundError,
     KeyPasswordError,
     KeytoolError,
@@ -27,8 +27,8 @@ except ModuleNotFoundError:
     rsa = None
     NameOID = None
 
-from genkeypair import read_password, resolve_alias
-from keystore import (
+from .genkeypair import read_password, resolve_alias
+from .keystore import (
     DEFAULT_KEYSTORE,
     DN_FIELDS,
     UNKNOWN_DN_VALUE,

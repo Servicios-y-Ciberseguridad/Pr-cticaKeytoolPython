@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.x509.oid import NameOID
 
 import mykeytool
-from errors import (
+from keytool.errors import (
     AliasNotFoundError,
     DuplicateAliasError,
     InvalidKeystoreError,
@@ -22,7 +22,7 @@ from errors import (
     KeystoreAuthenticationError,
     KeystoreNotFoundError,
 )
-from certreq import load_private_key, resolve_output_path
+from keytool.certreq import load_private_key, resolve_output_path
 
 
 class GenKeyPairTests(unittest.TestCase):
@@ -1028,6 +1028,145 @@ class GenKeyPairTests(unittest.TestCase):
                 self.assertNotIn("Traceback", errors.getvalue())
                 self.assertFalse(csr_path.exists())
 
+    def test_changealias_renames_entry_without_touching_private_key(self):
+        self.assertEqual(self.generate()[0], 0)
+        entries = mykeytool.load_keystore(self.path, self.password)
+        entries["miClave"]["certificate"] = "associated-certificate"
+        mykeytool.save_keystore(self.path, self.password, entries)
+        original_entry = mykeytool.load_keystore(self.path, self.password)["miClave"]
+
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            patch(
+                "keytool.certreq.serialization.load_pem_private_key",
+                side_effect=AssertionError(
+                    "changealias must not decrypt private keys"
+                ),
+            ),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "--changealias",
+                "-keystore",
+                str(self.path),
+                "-storepass",
+                self.password,
+                "-alias",
+                "miClave",
+                "-destalias",
+                "nuevaClave",
+            ])
+
+        self.assertEqual(result, 0, errors.getvalue())
+        self.assertIn("Exito", output.getvalue())
+        self.assertNotIn("PRIVATE KEY", output.getvalue() + errors.getvalue())
+        renamed_entries = mykeytool.load_keystore(self.path, self.password)
+        self.assertNotIn("miClave", renamed_entries)
+        self.assertEqual(renamed_entries["nuevaClave"], original_entry)
+
+    def test_changealias_prompts_for_aliases_when_omitted(self):
+        self.assertEqual(self.generate()[0], 0)
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            patch("mykeytool.getpass.getpass", return_value=self.password),
+            patch("builtins.input", side_effect=["miClave", "nuevaClave"]),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main(["-changealias", "-keystore", str(self.path)])
+
+        self.assertEqual(result, 0, errors.getvalue())
+        self.assertNotIn("PRIVATE KEY", output.getvalue() + errors.getvalue())
+        entries = mykeytool.load_keystore(self.path, self.password)
+        self.assertIn("nuevaClave", entries)
+        self.assertNotIn("miClave", entries)
+
+    def test_changealias_rejects_missing_or_duplicate_alias_without_changes(self):
+        self.assertEqual(self.generate()[0], 0)
+        before = self.path.read_bytes()
+        for source, destination, message in [
+            ("missing", "newAlias", "No existe el alias 'missing'"),
+            ("miClave", "miClave", "ya existe"),
+        ]:
+            with self.subTest(source=source, destination=destination):
+                output = io.StringIO()
+                errors = io.StringIO()
+                with (
+                    contextlib.redirect_stdout(output),
+                    contextlib.redirect_stderr(errors),
+                ):
+                    result = mykeytool.main([
+                        "-changealias",
+                        "-keystore",
+                        str(self.path),
+                        "-storepass",
+                        self.password,
+                        "-alias",
+                        source,
+                        "-destalias",
+                        destination,
+                    ])
+                self.assertEqual(result, 1)
+                self.assertIn(message, errors.getvalue())
+                self.assertNotIn("Traceback", errors.getvalue())
+                self.assertNotIn("PRIVATE KEY", output.getvalue() + errors.getvalue())
+                self.assertEqual(self.path.read_bytes(), before)
+
+    def test_changealias_rejects_empty_destination_without_changes(self):
+        self.assertEqual(self.generate()[0], 0)
+        before = self.path.read_bytes()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-changealias",
+                "-keystore",
+                str(self.path),
+                "-storepass",
+                self.password,
+                "-alias",
+                "miClave",
+                "-destalias",
+                "  ",
+            ])
+
+        self.assertEqual(result, 1)
+        self.assertIn("alias de destino no puede estar vacio", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_changealias_wrong_store_password_preserves_file_without_traceback(self):
+        self.assertEqual(self.generate()[0], 0)
+        before = self.path.read_bytes()
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            patch("mykeytool.getpass.getpass", return_value="wrong-password") as password_prompt,
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-changealias",
+                "-keystore",
+                str(self.path),
+                "-alias",
+                "miClave",
+                "-destalias",
+                "nuevaClave",
+            ])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(password_prompt.call_count, 1)
+        self.assertIn("incorrecta", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+        self.assertNotIn("PRIVATE KEY", output.getvalue() + errors.getvalue())
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_shows_certreq_help(self):
         output = io.StringIO()
         errors = io.StringIO()
@@ -1040,6 +1179,18 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertEqual(output.getvalue(), "")
         self.assertIn("Optional for -certreq", errors.getvalue())
         self.assertIn("-file FILE", errors.getvalue())
+
+    def test_shows_changealias_help(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main(["--changealias", "--help"])
+        self.assertEqual(result, 0)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("-destalias DESTALIAS", errors.getvalue())
 
 if __name__ == "__main__":
     unittest.main()

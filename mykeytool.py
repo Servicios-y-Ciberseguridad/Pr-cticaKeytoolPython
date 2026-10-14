@@ -1,5 +1,4 @@
 """Interfaz de linea de comandos para el simulador de Java Keytool."""
-
 from __future__ import annotations
 
 import argparse
@@ -70,27 +69,27 @@ def handoff_to_project_venv(argv: Sequence[str] | None) -> int | None:
     return subprocess.run(command, check=False).returncode
 
 
-def print_genkeypair_help() -> None:
+def printGenkeypairHelp() -> None:
     print(
         "usage: mykeytool.py -genkeypair -keyalg KEYALG [-keystore KEYSTORE] "
         "[-alias ALIAS] [-dname DNAME] [-storepass STOREPASS] [-keypass KEYPASS] "
         "[-keysize KEYSIZE]",
         file=sys.stderr,
-    )
-    print("", file=sys.stderr)
-    print("Required for -genkeypair:", file=sys.stderr)
-    print("  -keyalg KEYALG    algoritmo de la clave (solo RSA)", file=sys.stderr)
-    print("", file=sys.stderr)
-    print("Optional for -genkeypair:", file=sys.stderr)
-    print("  -keystore KEYSTORE", file=sys.stderr)
-    print("  -alias ALIAS", file=sys.stderr)
-    print("  -dname DNAME", file=sys.stderr)
-    print("  -storepass STOREPASS", file=sys.stderr)
-    print("  -keypass KEYPASS", file=sys.stderr)
-    print("  -keysize KEYSIZE", file=sys.stderr)
+    );
 
+    print("", file=sys.stderr);
+    print("Required for -genkeypair:", file=sys.stderr);
+    print("  -keyalg KEYALG    algoritmo de la clave (solo RSA)", file=sys.stderr);
+    print("", file=sys.stderr);
+    print("Optional for -genkeypair:", file=sys.stderr);
+    print("  -keystore KEYSTORE", file=sys.stderr);
+    print("  -alias ALIAS", file=sys.stderr);
+    print("  -dname DNAME", file=sys.stderr);
+    print("  -storepass STOREPASS", file=sys.stderr);
+    print("  -keypass KEYPASS", file=sys.stderr);
+    print("  -keysize KEYSIZE", file=sys.stderr);
 
-def print_main_help() -> None:
+def printMainHelp() -> None:
     print("usage: mykeytool.py [command]", file=sys.stdout)
     print("", file=sys.stdout)
     print("Comandos disponibles:", file=sys.stdout)
@@ -118,7 +117,8 @@ def build_parser() -> argparse.ArgumentParser:
         const="genkeypair",
         dest="command",
         help="genera un par de claves RSA y lo guarda en el KeyStore",
-    )
+    );
+
     commands.add_argument(
         "-certreq",
         "--certreq",
@@ -126,7 +126,8 @@ def build_parser() -> argparse.ArgumentParser:
         const="certreq",
         dest="command",
         help="genera una solicitud de firma de certificado (CSR)",
-    )
+    );
+
     parser.add_argument(
         "-keystore",
         "--keystore",
@@ -163,7 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     handlers: dict[str, CommandHandler] = {
-        "genkeypair": lambda: handle_genkeypair(
+        "genkeypair": lambda: handleGenkeypair(
             args.keystore,
             alias=args.alias,
             storepass=args.storepass,
@@ -178,4 +179,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main();

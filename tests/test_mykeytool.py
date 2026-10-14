@@ -1,3 +1,4 @@
+import base64
 import contextlib
 import io
 import tempfile
@@ -774,10 +775,21 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertIn("Exito", output.getvalue())
         self.assertNotIn(self.password, output.getvalue() + errors.getvalue())
         pem = csr_path.read_bytes()
-        self.assertTrue(pem.startswith(b"-----BEGIN CERTIFICATE REQUEST-----"))
+        self.assertTrue(
+            pem.startswith(b"-----BEGIN NEW CERTIFICATE REQUEST-----\n")
+        )
+        self.assertTrue(pem.endswith(b"-----END NEW CERTIFICATE REQUEST-----\n"))
         self.assertNotIn(b"PRIVATE KEY", pem)
 
+        lines = pem.splitlines()
+        encoded_lines = lines[1:-1]
+        self.assertTrue(encoded_lines)
+        self.assertTrue(all(len(line) == 64 for line in encoded_lines[:-1]))
+        self.assertLessEqual(len(encoded_lines[-1]), 64)
+        der = base64.b64decode(b"".join(encoded_lines), validate=True)
+
         csr = x509.load_pem_x509_csr(pem)
+        self.assertEqual(der, csr.public_bytes(serialization.Encoding.DER))
         self.assertTrue(csr.is_signature_valid)
         self.assertEqual(csr.signature_hash_algorithm.name, "sha256")
         expected_subject = {
@@ -860,6 +872,10 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertEqual(
             resolve_output_path(None, "equipo/produccion"),
             Path("equipo_produccion.csr"),
+        )
+        self.assertEqual(
+            resolve_output_path(Path("peticion.pem"), "miClave"),
+            Path("peticion.pem"),
         )
 
     def test_certreq_rejects_missing_alias_without_creating_output(self):
@@ -1002,7 +1018,7 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(output.getvalue(), "")
         self.assertIn("Optional for -certreq", errors.getvalue())
-        self.assertIn("-file FILE.csr", errors.getvalue())
+        self.assertIn("-file FILE", errors.getvalue())
 
 if __name__ == "__main__":
     unittest.main()

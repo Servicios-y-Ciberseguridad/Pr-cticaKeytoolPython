@@ -1,57 +1,52 @@
 """Interfaz de linea de comandos para el simulador de Java Keytool."""
-
 from __future__ import annotations
 
 import argparse
 import getpass
-import json
 import os
-import shlex
 import subprocess
 import sys
-import tempfile
-import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TypedDict
 
-try:
-    from cryptography.exceptions import InvalidTag
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-except ModuleNotFoundError as exc:
-    InvalidTag = None
-    serialization = None
-    rsa = None
-    AESGCM = None
-    Scrypt = None
-    CRYPTO_IMPORT_ERROR = exc
-else:
-    CRYPTO_IMPORT_ERROR = None
+from certreq import handle_certreq
+from genkeypair import (
+    MAX_ALIAS_ATTEMPTS,
+    MAX_PASSWORD_ATTEMPTS,
+    handle_genkeypair,
+    open_keystore_with_password,
+    parse_dname,
+    read_dname_interactively,
+    read_password,
+    read_required,
+    read_store_password,
+    resolve_alias,
+    resolve_dname,
+    resolve_key_algorithm,
+    resolve_key_password,
+    resolve_key_size,
+    resolve_unique_alias,
+    validate_country,
+)
+from keystore import (
+    AES_GCM_TAG_SIZE,
+    CRYPTO_IMPORT_ERROR,
+    DEFAULT_KEYSTORE,
+    DN_FIELDS,
+    STORE_HEADER,
+    STORE_NONCE_SIZE,
+    STORE_SALT_SIZE,
+    UNKNOWN_DN_VALUE,
+    KeyEntry,
+    derive_store_key,
+    ensure_crypto_available,
+    load_keystore,
+    load_keystore_entry,
+    save_keystore,
+)
 
 CommandHandler = Callable[[], int]
-DEFAULT_KEYSTORE = Path("keystore.myks")
-STORE_HEADER = b"MYKEYSTORE\x01"
-STORE_SALT_SIZE = 16
-STORE_NONCE_SIZE = 12
-AES_GCM_TAG_SIZE = 16
-DN_FIELDS = ("CN", "OU", "O", "L", "ST", "C")
-UNKNOWN_DN_VALUE = "Unknown"
-MAX_PASSWORD_ATTEMPTS = 3
-MAX_ALIAS_ATTEMPTS = 3
-
-class KeyEntry(TypedDict):
-    private_key: str
-    public_key: str
-    dn: dict[str, str]
-
-def ensure_crypto_available() -> None:
-    if CRYPTO_IMPORT_ERROR is not None:
-        raise ModuleNotFoundError(
-            "No se pudo importar 'cryptography' con este interprete de Python."
-        ) from CRYPTO_IMPORT_ERROR
 
 
 class GenKeyPairOptions(TypedDict, total=False):
@@ -61,6 +56,7 @@ class GenKeyPairOptions(TypedDict, total=False):
     dname: str
     keyalg: str
     keysize: int
+
 
 def handoff_to_project_venv(argv: Sequence[str] | None) -> int | None:
     if CRYPTO_IMPORT_ERROR is None:
@@ -208,6 +204,7 @@ def resolve_key_algorithm(keyalg: str | None) -> str:
         raise ValueError("Solo se admite -keyalg RSA en esta implementacion.")
     return algorithm
 
+
 def resolve_key_size(keysize: int | None) -> int:
     if keysize is not None:
         resolved = keysize
@@ -216,8 +213,8 @@ def resolve_key_size(keysize: int | None) -> int:
         resolved = 2048 if entered == "" else int(entered)
     if resolved < 1024:
         raise ValueError("-keysize debe ser un entero de al menos 1024 bits.")
-    
     return resolved
+
 
 def parse_dname(dname: str) -> dict[str, str]:
     parts = [part.strip() for part in dname.split(",") if part.strip()]
@@ -235,6 +232,7 @@ def parse_dname(dname: str) -> dict[str, str]:
         raise ValueError("-dname debe incluir exactamente CN, OU, O, L, ST y C.")
     return values
 
+
 def validate_country(dn: dict[str, str]) -> None:
     country = dn["C"]
     if country == UNKNOWN_DN_VALUE:
@@ -242,6 +240,7 @@ def validate_country(dn: dict[str, str]) -> None:
     if len(country) != 2 or not country.isascii() or not country.isalpha():
         raise ValueError("C debe ser un codigo de pais de dos letras (p. ej. ES).")
     dn["C"] = country.upper()
+
 
 def read_dname_interactively() -> dict[str, str]:
     prompts = {
@@ -258,7 +257,6 @@ def read_dname_interactively() -> dict[str, str]:
             field: input(prompts[field]).strip() or UNKNOWN_DN_VALUE
             for field in DN_FIELDS
         }
-
         validate_country(dn)
         rendered = ", ".join(f"{field}={dn[field]}" for field in DN_FIELDS)
         confirmation = input(f"Is {rendered} correct? [no/yes]: ").strip().lower()
@@ -267,12 +265,14 @@ def read_dname_interactively() -> dict[str, str]:
         if confirmation in {"", "n", "no"}:
             continue
 
+
 def resolve_dname(dname: str | None) -> dict[str, str]:
     if dname is not None:
         parsed = parse_dname(dname)
         validate_country(parsed)
         return parsed
     return read_dname_interactively()
+
 
 def read_store_password(path: Path, storepass: str | None) -> str:
     if storepass is not None:
@@ -287,6 +287,7 @@ def read_store_password(path: Path, storepass: str | None) -> str:
         if storepass is None and read_password("Re-enter new password: ") != password:
             raise ValueError("Las contrasenas no coinciden.")
     return password
+
 
 def open_keystore_with_password(
     path: Path, storepass: str | None
@@ -340,6 +341,7 @@ def open_keystore_with_password(
     assert last_error is not None
     raise last_error
 
+
 def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str:
     if keypass is not None:
         if not keypass:
@@ -354,6 +356,7 @@ def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str
         raise ValueError("Las contrasenas de la clave no coinciden.")
     return password
 
+
 def resolve_alias(alias: str | None) -> str:
     if alias is not None:
         resolved = alias.strip()
@@ -367,6 +370,7 @@ def resolve_alias(alias: str | None) -> str:
     if not resolved:
         raise ValueError("Los campos solicitados no pueden estar vacios.")
     return resolved
+
 
 def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str:
     if alias is not None:
@@ -388,6 +392,7 @@ def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str
             file=sys.stderr,
         )
     raise ValueError(f"El alias '{last_alias}' ya existe.")
+
 
 def handle_genkeypair(
     path: Path = DEFAULT_KEYSTORE,
@@ -448,6 +453,7 @@ def handle_certreq() -> int:
     print("La generacion de solicitudes CSR se implementara en el siguiente modulo.")
     return 0
 
+
 def print_genkeypair_help() -> None:
     print(
         "usage: mykeytool.py -genkeypair -keyalg KEYALG [-keystore KEYSTORE] "
@@ -467,6 +473,7 @@ def print_genkeypair_help() -> None:
     print("  -keypass KEYPASS", file=sys.stderr)
     print("  -keysize KEYSIZE", file=sys.stderr)
 
+
 def print_main_help() -> None:
     print("usage: mykeytool.py [command]", file=sys.stdout)
     print("", file=sys.stdout)
@@ -475,6 +482,7 @@ def print_main_help() -> None:
     print("  -certreq, --certreq          genera una solicitud CSR", file=sys.stdout)
     print("", file=sys.stdout)
     print("Usa 'mykeytool.py -genkeypair -h' para ver sus argumentos.", file=sys.stdout)
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Construye y devuelve el analizador de argumentos de la aplicacion."""
@@ -486,7 +494,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog="Ejemplo: python3 mykeytool.py --genkeypair",
     )
-
     commands = parser.add_mutually_exclusive_group(required=False)
     commands.add_argument(
         "-genkeypair",
@@ -495,7 +502,8 @@ def build_parser() -> argparse.ArgumentParser:
         const="genkeypair",
         dest="command",
         help="genera un par de claves RSA y lo guarda en el KeyStore",
-    )
+    );
+
     commands.add_argument(
         "-certreq",
         "--certreq",
@@ -503,7 +511,8 @@ def build_parser() -> argparse.ArgumentParser:
         const="certreq",
         dest="command",
         help="genera una solicitud de firma de certificado (CSR)",
-    )
+    );
+
     parser.add_argument(
         "-keystore",
         "--keystore",
@@ -511,20 +520,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_KEYSTORE,
         help="archivo del almacen propio cifrado (por defecto: keystore.myks)",
     )
-
     parser.add_argument("-alias", help="alias de la entrada a generar")
-    parser.add_argument("-dname", help="DN en formato CN=..., OU=..., O=..., L=..., ST=..., C=...")
+    parser.add_argument(
+        "-dname", help="DN en formato CN=..., OU=..., O=..., L=..., ST=..., C=..."
+    )
     parser.add_argument("-storepass", help="contrasena del KeyStore")
     parser.add_argument("-keypass", help="contrasena de la clave generada")
     parser.add_argument("-keyalg", help="algoritmo de la clave (solo RSA)")
     parser.add_argument("-keysize", type=int, help="tamano de clave en bits")
-
     return parser
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Procesa los argumentos y ejecuta el manejador del comando elegido."""
     handoff_result = handoff_to_project_venv(argv)
-
     if handoff_result is not None:
         return handoff_result
     arg_list = list(argv if argv is not None else sys.argv[1:])
@@ -534,19 +543,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         print_genkeypair_help()
         return 0
-
     args = parser.parse_args(arg_list)
-
-    if args.command is None and not any(flag in arg_list for flag in ("-h", "--help")):
-        print_main_help()
-        return 0
-
     if args.command is None:
         print_main_help()
         return 0
 
     handlers: dict[str, CommandHandler] = {
-        "genkeypair": lambda: handle_genkeypair(
+        "genkeypair": lambda: handleGenkeypair(
             args.keystore,
             alias=args.alias,
             storepass=args.storepass,
@@ -555,11 +558,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             keyalg=args.keyalg,
             keysize=args.keysize,
         ),
-
         "certreq": handle_certreq,
     }
-
     return handlers[args.command]()
 
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main();

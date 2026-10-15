@@ -33,11 +33,9 @@ from .keystore import (
     DN_FIELDS,
     UNKNOWN_DN_VALUE,
     KeyEntry,
-    ensure_crypto_available,
     load_keystore,
     write_bytes_atomic,
 )
-
 
 # Los nombres se guardan como texto para que el modulo pueda cargarse incluso
 # cuando cryptography no este instalado; main intentara usar el entorno virtual.

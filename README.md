@@ -4,6 +4,11 @@ Este proyecto consiste en una implementación en Python de una herramienta simil
 
 La idea de la práctica es aprender a trabajar con criptografía, generación de claves, y manejo básico de certificados en un entorno CLI.
 
+## Integrantes
+
+- Yangpeng Ni
+- Víctor Iniesta Romera
+
 ## Objetivo
 
 Crear un programa Python que permita:
@@ -18,21 +23,27 @@ Crear un programa Python que permita:
 
 ## Requisitos
 
-- Python 3.10 o superior
+- Python 3.10 o superior (comprobado con Python 3.14)
 - pip
-- Entorno virtual recomendado
-- En Windows, usa el Python oficial de python.org para crear el entorno virtual
+- Git
+- Un entorno virtual de Python (recomendado)
 
 ## Instalación
 
-1. Clona o descarga este repositorio.
-2. Crea un entorno virtual con el Python oficial de Windows:
+Clona el repositorio y entra en el directorio del proyecto:
 
 ```bash
-py -3.14 -m venv .venv
+git clone https://github.com/Servicios-y-Ciberseguridad/PracticaKeytoolPython.git
+cd PracticaKeytoolPython
 ```
 
-3. Activa el entorno virtual:
+Usa Python 3.10 o superior para crear un entorno virtual:
+
+```bash
+python -m venv .venv
+```
+
+Activa el entorno:
 
 - Windows (PowerShell):
 
@@ -46,23 +57,43 @@ py -3.14 -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
-4. Instala las dependencias:
+- macOS/Linux:
 
 ```bash
-pip install -r requirements.txt
+source .venv/bin/activate
 ```
 
-La dependencia principal también puede instalarse directamente con:
+Instala las dependencias declaradas por el proyecto:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+La dependencia criptográfica también se puede instalar directamente:
 
 ```bash
 pip install cryptography
 ```
 
-Si ya tienes un entorno creado con MSYS2 o MinGW, recrealo con el Python oficial de Windows para poder instalar `cryptography` sin errores de compatibilidad.
+`requirements.txt` fija `cryptography>=50.0.0`. En Windows, si la instalación
+falla desde un entorno MSYS2 o MinGW, crea el entorno virtual con el Python
+oficial de python.org.
 
-## Dependencias
+## Ejecución
 
-Este proyecto usa la librería `cryptography`, que permite generar claves, certificados y manejar operaciones criptográficas modernas de forma segura.
+Desde la raíz del repositorio, ejecuta la CLI con cualquiera de estas formas:
+
+```bash
+python mykeytool.py --help
+python -m keytool --help
+```
+
+También puedes usar el ejecutable del entorno virtual explícitamente:
+
+```powershell
+.\.venv\Scripts\python.exe .\mykeytool.py --help
+```
 
 ## Estructura del proyecto
 
@@ -83,11 +114,13 @@ Pr-cticaKeytoolPython/
 │   ├── listing.py        # Listado autenticado de datos publicos
 │   └── errors.py         # Errores de dominio
 ├── tests/
-│   └── test_mykeytool.py
+│   ├── test_exportcert.py
+│   ├── test_gencert.py
+│   ├── test_listing.py
+│   ├── test_mykeytool.py
+│   └── test_storepasswd.py
 ├── README.md             # Documentación del proyecto
 ├── requirements.txt      # Dependencias del proyecto
-├── .venv/               # Entorno virtual recomendado
-├── env/                 # Entorno virtual antiguo (opcional)
 └── .gitignore           # Archivos ignorados por Git
 ```
 
@@ -111,6 +144,17 @@ permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
 
+### Decisiones relevantes
+
+- El KeyStore `MYKEYSTORE` es un formato propio versionado; no es un almacén JKS
+  ni PKCS12. Protege los datos con AES-GCM y deriva la clave con Scrypt.
+- `storepass` protege el almacén y `keypass` protege individualmente la clave
+  privada. No se exportan claves privadas.
+- Las escrituras de certificados y solicitudes son atómicas para conservar el
+  archivo anterior si falla la operación.
+- Los certificados autofirmados de `genkeypair` no son autoridades certificadoras
+  (`CA=false`). `gencert` firma CSR, pero no valida la confianza de una cadena CA.
+
 El recorrido de `--certreq` se puede explicar en tres pasos:
 
 ```text
@@ -124,61 +168,90 @@ escribe en el CSR.
 
 ## Uso previsto
 
-Si ejecutas el programa sin parametros, muestra solo los comandos disponibles:
+### Ayuda de la CLI
 
 ```bash
-python mykeytool.py
+python mykeytool.py --help
+python mykeytool.py --genkeypair --help
+python mykeytool.py --certreq --help
 ```
 
-Para ver la ayuda especifica de `genkeypair`, usa:
+Ejemplo de salida real de la ayuda general:
+
+```text
+> python mykeytool.py --help
+usage: mykeytool.py [-h] [-genkeypair | -certreq | -changealias | -list |
+                    -exportcert | -storepasswd | -gencert] ...
+...
+options:
+  -h, --help            show this help message and exit
+  -genkeypair, --genkeypair
+                        genera un par de claves RSA y lo guarda en el KeyStore
+  -certreq, --certreq   genera una solicitud de firma de certificado (CSR)
+...
+```
+
+Sin argumentos, `python mykeytool.py` muestra la lista de comandos disponibles.
+La ayuda también enumera las opciones generales, por ejemplo `-keyalg`,
+`-keysize`, `-infile` y `-outfile`.
+
+`--genkeypair --help` y `--certreq --help` muestran respectivamente las opciones
+del par de claves y de la solicitud CSR. Los ejemplos usan la misma interfaz que
+`mykeytool.py`; también se puede anteponer `python -m keytool`.
+
+### Generar un par de claves
+
+El comando requiere `-keyalg RSA`. Los demás datos se pueden proporcionar como
+argumentos o introducir cuando se soliciten. Por ejemplo:
 
 ```bash
-python mykeytool.py -genkeypair -h
-python mykeytool.py -genkeypair --help
+python mykeytool.py --genkeypair -keyalg RSA -keysize 2048 -alias demo -dname "CN=Demo, OU=Seguridad, O=Universidad, L=Madrid, ST=Madrid, C=ES"
 ```
 
-La ayuda específica de `certreq` muestra sus opciones compatibles con el estilo de
-`keytool`:
+Al omitir `-storepass` y `-keypass`, se solicitan sin eco. Ejemplo del mensaje de
+resultado al usar el alias y el almacén de ejemplo:
+
+```text
+Exito: par RSA de 2048 bits guardado con alias 'demo' en 'keystore.myks'.
+```
+
+### Generar una solicitud CSR
+
+Después de crear el alias `demo`, genera su CSR:
 
 ```bash
-python mykeytool.py -certreq --help
+python mykeytool.py --certreq -keystore keystore.myks -alias demo -file demo.csr
 ```
 
-El flujo mas simple para generar un par de claves es:
+Si se omiten las contraseñas, el programa las solicita sin eco. El CSR contiene
+el sujeto y la clave pública, nunca la clave privada. Ejemplo del resultado:
 
-```bash
-python mykeytool.py --genkeypair -keyalg RSA
-python mykeytool.py --certreq -keystore keystore.myks
-python mykeytool.py --changealias -keystore keystore.myks -alias mykey -destalias nuevaClave
+```text
+Exito: CSR del alias 'demo' guardado en 'demo.csr' en formato PEM compatible con keytool.
 ```
+
+La siguiente secuencia de consola muestra ambos comandos después de introducir
+las contraseñas cuando se solicitan:
+
+```text
+> python mykeytool.py --genkeypair -keyalg RSA -keysize 2048 -alias demo -dname "CN=Demo, OU=Seguridad, O=Universidad, L=Madrid, ST=Madrid, C=ES"
+Exito: par RSA de 2048 bits guardado con alias 'demo' en 'keystore.myks'.
+> python mykeytool.py --certreq -keystore keystore.myks -alias demo -file demo.csr
+Exito: CSR del alias 'demo' guardado en 'demo.csr' en formato PEM compatible con keytool.
+```
+
+Los mensajes de contraseña se omiten en el bloque: el programa los solicita sin
+eco y no los guarda en el historial de comandos.
+
+Cada entrada nueva incluye además un certificado X.509 autofirmado en PEM, con
+el DN como sujeto y emisor, firma RSA/SHA-256 y vigencia de 90 días. No es una
+autoridad certificadora (`CA=false`). Las entradas antiguas sin certificado
+siguen siendo compatibles.
 
 `-changealias` también admite `--changealias`. Si se omiten `-storepass`,
 `-alias` o `-destalias`, los solicita de forma interactiva; la contraseña se
-solicita sin eco. El cambio conserva todos los datos de la entrada, incluida la
-clave privada en su forma cifrada y cualquier certificado asociado, sin pedir ni
-descifrar la contraseña de la clave privada.
-
-Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
-
-```bash
-python mykeytool.py -genkeypair -alias mykey -keyalg RSA -keysize 2048 -dname "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES"
-```
-
-Cada nueva entrada incluye un certificado X.509 autofirmado en PEM, con el DN
-como sujeto y emisor, número de serie aleatorio, firma RSA/SHA-256 y vigencia de
-90 días desde su creación. No es un certificado de autoridad certificadora
-(`CA=false`) ni proporciona confianza pública por sí mismo. Se guarda dentro
-del KeyStore cifrado y `-list` muestra automáticamente su huella SHA-256.
-La clave privada sigue cifrada con `keypass`.
-
-Las entradas anteriores sin certificado siguen siendo compatibles; no se
-modifican automáticamente. Para probarlo, genera un alias nuevo y consúltalo:
-
-```bash
-python -m keytool -genkeypair -alias nuevaClave -keyalg RSA -keysize 2048
-python -m keytool -list -alias nuevaClave
-python -m keytool -list -alias nuevaClave -v
-```
+solicita sin eco. El cambio conserva los datos de la entrada, incluida la clave
+privada cifrada y los certificados asociados.
 
 ### Emitir un certificado desde un CSR
 
@@ -396,6 +469,7 @@ controlado y es necesario ejecutar de nuevo el comando.
 
 - `keyalg`
 - `keysize` con valor por defecto `2048`; admite `2048`, `3072`, `4096`, `7680`
+  y `15360`
 - contrasena del KeyStore
 - contrasena de la clave (`RETURN` reutiliza la del KeyStore)
 - alias con valor por defecto `mykey`
@@ -475,25 +549,45 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 .\.venv\Scripts\python.exe .\mykeytool.py --genkeypair -keyalg RSA
 ```
 
+## Historial de contribuciones
+
+Se conserva el historial Git de ambos integrantes. Como ejemplos de commits
+representativos:
+
+| Integrante | Commit | Aportación |
+|---|---|---|
+| Yangpeng Ni | `ed6d4d7` | Implementación de `-gencert` |
+| Víctor Iniesta Romera | `f7b8e47` | Cambios de integración del proyecto |
+
 ## Matriz de pruebas ejecutadas
 
-| Área | Verificación automatizada | Resultado esperado |
-|---|---|---|
-| `genkeypair` | RSA 2048/3072/4096, DN, alias duplicado y persistencia cifrada | La entrada se crea sin exponer secretos |
-| KeyStore | Contraseña correcta/incorrecta, formato inválido, manipulación y archivo inexistente | Acceso autenticado o error controlado |
-| `certreq` | CSR PEM, firma SHA-256, sujeto DN y coincidencia de clave pública | CSR válido y firmado por la clave del alias |
-| Privacidad | Inspección del PEM y de los mensajes de consola | No aparece ninguna clave privada ni contraseña |
-| Errores de CSR | Alias inexistente, contraseña de almacén/clave incorrecta y almacén dañado | Código de salida 1, sin traceback ni archivo parcial |
-| CLI | Ayuda general y ayuda específica de ambos comandos | Opciones y sintaxis visibles |
-| `list` | Almacén vacío, varios alias, orden estable, filtro, detalles públicos y errores | Listado autenticado, solo lectura y sin secretos |
-| `storepasswd` | Cambio correcto, reglas de longitud y confirmación, intento único, claves intactas y fallos de escritura/reemplazo | Contraseña nueva válida, anterior rechazada y archivo original conservado ante errores |
-| `gencert` | Firma SHA-256, sujeto, emisor, validez, CSR PEM/DER, extensiones, errores y escritura atómica | X.509 verificable con cryptography y OpenSSL, sin claves privadas ni cambios en el almacén |
-| `exportcert` | Exportación DER/PEM, autenticación, alias y archivo de salida | Certificado público válido sin leer claves privadas ni modificar el almacén |
+Resultados obtenidos el 15 de octubre de 2026 con Python 3.14.7. Los módulos
+funcionales se ejecutaron individualmente con `unittest discover`; la prueba
+completa se ejecutó además con el comando indicado al final de la tabla.
+
+| Área | Casos cubiertos | Resultado esperado | Resultado obtenido |
+|---|---|---|---|
+| CLI, `genkeypair` y `certreq` | Ayuda general y específica; generación RSA y CSR en una ejecución temporal | Ayuda con las opciones reales; almacén creado y CSR PEM exportado | Correcto: se ejecutaron las ayudas y la generación produjo almacén y CSR |
+| `storepasswd` | Contraseña válida/incorrecta, confirmación, conservación de claves y fallos de escritura | Cambio autenticado; conservar el almacén original ante errores | Correcto: 19 pruebas, 19 aprobadas |
+| `list` | Orden, filtro, metadatos públicos, alias ausente y autenticación | Listado estable sin exponer claves; errores controlados | Correcto: 18 pruebas, 18 aprobadas |
+| `gencert` | CSR PEM/DER, firma, vigencia, extensiones, entradas incorrectas y escritura atómica | Certificado verificable; no escribir salida parcial ante errores | Correcto: 20 pruebas, 20 aprobadas |
+| `exportcert` | DER/PEM, alias, contraseñas, salida atómica y protección del almacén | Exportar solo el certificado; preservar el almacén y la salida previa ante errores | Correcto: 7 pruebas, 7 aprobadas |
+| Suite completa | Descubrimiento de todos los módulos de prueba | Todas las pruebas importan y pasan | **Pendiente de corregir:** 64 pruebas aprobadas y error al importar `tests/test_mykeytool.py`; el archivo contiene marcadores de conflicto Git (`<<<<<<< HEAD`) y da `SyntaxError` en la línea 1 |
 
 La suite completa se ejecuta con:
 
 ```bash
 python -m unittest discover -s tests -v
+```
+
+Hasta resolver los marcadores de conflicto indicados, se pueden repetir por
+separado los cuatro módulos funcionales que pasan:
+
+```bash
+python -m unittest discover -s tests -p test_storepasswd.py -v
+python -m unittest discover -s tests -p test_listing.py -v
+python -m unittest discover -s tests -p test_gencert.py -v
+python -m unittest discover -s tests -p test_exportcert.py -v
 ```
 
 ## Nota

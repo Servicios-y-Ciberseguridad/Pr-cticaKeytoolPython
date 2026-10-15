@@ -36,10 +36,14 @@ AES_GCM_TAG_SIZE = 16
 DN_FIELDS = ("CN", "OU", "O", "L", "ST", "C")
 UNKNOWN_DN_VALUE = "Unknown"
 
-class KeyEntry(TypedDict):
+class RequiredKeyEntry(TypedDict):
     private_key: str
     public_key: str
     dn: dict[str, str]
+
+
+class KeyEntry(RequiredKeyEntry, total=False):
+    certificate: str
 
 def ensure_crypto_available() -> None:
     if CRYPTO_IMPORT_ERROR is not None:

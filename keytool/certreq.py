@@ -19,34 +19,19 @@ try:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.x509.oid import NameOID
 except ModuleNotFoundError:
     x509 = None
     hashes = None
     serialization = None
     rsa = None
-    NameOID = None
 
-from .genkeypair import read_password, resolve_alias
+from .genkeypair import build_subject, read_password, resolve_alias
 from .keystore import (
     DEFAULT_KEYSTORE,
-    DN_FIELDS,
-    UNKNOWN_DN_VALUE,
     KeyEntry,
     load_keystore,
     write_bytes_atomic,
 )
-
-# Los nombres se guardan como texto para que el modulo pueda cargarse incluso
-# cuando cryptography no este instalado; main intentara usar el entorno virtual.
-DN_OIDS = {
-    "CN": "COMMON_NAME",
-    "OU": "ORGANIZATIONAL_UNIT_NAME",
-    "O": "ORGANIZATION_NAME",
-    "L": "LOCALITY_NAME",
-    "ST": "STATE_OR_PROVINCE_NAME",
-    "C": "COUNTRY_NAME",
-}
 
 KEYTOOL_PEM_HEADER = b"-----BEGIN NEW CERTIFICATE REQUEST-----"
 KEYTOOL_PEM_FOOTER = b"-----END NEW CERTIFICATE REQUEST-----"
@@ -105,18 +90,6 @@ def load_private_key(
     if not isinstance(private_key, rsa.RSAPrivateKey):
         raise ValueError(f"La clave del alias '{alias}' no es RSA.")
     return private_key
-
-
-def build_subject(dn: dict[str, str]):
-    """Convierte los campos CN, OU, O, L, ST y C en un sujeto X.509."""
-    attributes = []
-    for field in DN_FIELDS:
-        value = dn[field]
-        if field == "C" and value == UNKNOWN_DN_VALUE:
-            continue
-        oid = getattr(NameOID, DN_OIDS[field])
-        attributes.append(x509.NameAttribute(oid, value))
-    return x509.Name(attributes)
 
 
 def resolve_output_path(output: Path | None, alias: str) -> Path:

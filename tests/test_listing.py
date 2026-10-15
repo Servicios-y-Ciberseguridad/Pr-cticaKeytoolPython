@@ -76,9 +76,26 @@ class ListTests(unittest.TestCase):
         self.assertEqual(output, "")
         self.assertIn(message, errors)
 
+    def expected_listing(self, *aliases):
+        count = len(aliases)
+        noun = "entry" if count == 1 else "entries"
+        lines = [
+            "Keystore type: MYKEYSTORE (version 1)",
+            "Keystore provider: Python cryptography",
+            "",
+            f"Your keystore contains {count} {noun}",
+        ]
+        for alias in aliases:
+            lines.extend([
+                "",
+                f"{alias}, creation date unavailable, PrivateKeyEntry,",
+                "Certificate fingerprint (SHA-256): unavailable (no certificate)",
+            ])
+        return "\n".join(lines) + "\n"
+
     def test_empty_store(self):
         save_keystore(self.path, self.password, {})
-        self.assertEqual(self.run_list(), (0, "Entradas: 0\n", ""))
+        self.assertEqual(self.run_list(), (0, self.expected_listing(), ""))
 
     def test_lists_all_aliases_in_stable_order_without_modifying_store(self):
         save_keystore(self.path, self.password, {
@@ -87,7 +104,7 @@ class ListTests(unittest.TestCase):
         before = self.path.read_bytes()
         result = self.run_list(command="--list")
         self.assertEqual(result, (
-            0, 'Entradas: 3\nAlias: "Beta"\nAlias: "alpha"\nAlias: "zeta"\n', ""
+            0, self.expected_listing("Beta", "alpha", "zeta"), ""
         ))
         self.assertEqual(self.path.read_bytes(), before)
 
@@ -96,7 +113,7 @@ class ListTests(unittest.TestCase):
             "alpha": self.entry(), "zeta": self.entry()
         })
         self.assertEqual(self.run_list("-alias", " zeta "), (
-            0, 'Entradas: 1\nAlias: "zeta"\n', ""
+            0, self.expected_listing("zeta"), ""
         ))
 
     def test_verbose_reports_public_key_and_dn_without_certificate(self):
@@ -139,11 +156,24 @@ class ListTests(unittest.TestCase):
             'Sujeto: "CN=Ana"', 'Emisor: "CN=Test CA"', "Numero de serie: 4D2",
             now.isoformat(), (now + timedelta(days=30)).isoformat(),
             certificate.signature_algorithm_oid.dotted_string,
-            certificate.fingerprint(hashes.SHA256()).hex().upper(),
+            certificate.fingerprint(hashes.SHA256()).hex(":").upper(),
         ):
             self.assertIn(expected, output)
         self.assertNotIn("must-not-appear-in-output", output)
         self.assertNotIn("BEGIN CERTIFICATE", output)
+        code, output, errors = self.run_list()
+        self.assertEqual(code, 0, errors)
+        self.assertIn("Your keystore contains 1 entry", output)
+        self.assertIn("certified, creation date unavailable, PrivateKeyEntry,", output)
+        self.assertIn(
+            "Certificate fingerprint (SHA-256): "
+            + certificate.fingerprint(hashes.SHA256()).hex(":").upper(),
+            output,
+        )
+        self.assertNotIn("Sujeto:", output)
+        self.assertNotIn("Tamano de clave publica:", output)
+        self.assertNotIn("PKCS12", output)
+        self.assertNotIn("SUN", output)
 
     def test_missing_alias(self):
         save_keystore(self.path, self.password, {"alpha": self.entry()})
@@ -186,7 +216,9 @@ class ListTests(unittest.TestCase):
     def test_prompts_once_for_store_password_without_echo(self):
         save_keystore(self.path, self.password, {})
         with patch("mykeytool.getpass.getpass", return_value=self.password) as prompt:
-            self.assertEqual(self.run_list(interactive=True), (0, "Entradas: 0\n", ""))
+            self.assertEqual(
+                self.run_list(interactive=True), (0, self.expected_listing(), "")
+            )
         prompt.assert_called_once_with("Enter keystore password: ")
 
     def test_no_terminal_fails_instead_of_echoing_password(self):
@@ -226,7 +258,10 @@ class ListTests(unittest.TestCase):
                 result = self.run_list("-v")
                 self.assert_error(result, message)
                 self.assertNotIn(str(value), result[2])
-                self.assertEqual(self.run_list()[0], 0)
+                if field == "certificate":
+                    self.assert_error(self.run_list(), message)
+                else:
+                    self.assertEqual(self.run_list()[0], 0)
                 self.assertEqual(self.run_list("-v", "-alias", "alpha")[0], 0)
 
     def test_control_characters_in_public_fields_are_escaped(self):
@@ -236,7 +271,10 @@ class ListTests(unittest.TestCase):
         save_keystore(self.path, self.password, {alias: entry})
         code, output, errors = self.run_list("-v")
         self.assertEqual(code, 0, errors)
-        self.assertIn(f"Alias: {json.dumps(alias)}\n", output)
+        self.assertIn(
+            f"{json.dumps(alias)[1:-1]}, creation date unavailable, PrivateKeyEntry,",
+            output,
+        )
         self.assertIn("Ana\\nEmisor: fake", output)
         self.assertNotIn("\x1b", output)
 

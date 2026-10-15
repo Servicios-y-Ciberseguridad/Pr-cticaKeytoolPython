@@ -561,24 +561,68 @@ representativos:
 
 ## Matriz de pruebas ejecutadas
 
-Resultados obtenidos el 15 de octubre de 2026 con Python 3.14.7. Los módulos
-funcionales se ejecutaron individualmente con `unittest discover`; la prueba
-completa se ejecutó además con el comando indicado al final de la tabla.
+Resultados obtenidos el 15 de octubre de 2026 con Python 3.14.7, mediante
+`unittest discover`. Las cantidades cuentan métodos de prueba; los casos
+parametrizados con `subTest` comprueban además varias entradas por método.
 
 | Área | Casos cubiertos | Resultado esperado | Resultado obtenido |
 |---|---|---|---|
-| CLI, `genkeypair` y `certreq` | Ayuda general y específica; generación RSA y CSR en una ejecución temporal | Ayuda con las opciones reales; almacén creado y CSR PEM exportado | Correcto: se ejecutaron las ayudas y la generación produjo almacén y CSR |
-| Integración (`test_mykeytool.py`) | Generación RSA, certificados autofirmados, persistencia cifrada, CSR, ayuda, alias duplicado y contraseñas incorrectas | Operaciones correctas y errores controlados sin modificar el almacén ante fallos | Correcto: 50 pruebas, 50 aprobadas tras resolver los conflictos de merge |
+| Argumentos CLI (`CliArgumentTests`) | Ayuda general y de los siete comandos con ambas grafías; opciones desconocidas, comandos incompatibles, valores ausentes y números inválidos | Ayuda sin solicitar contraseñas; argumentos inválidos rechazados con código 2, uso y diagnóstico, sin crear archivos | Correcto: 6 pruebas, 6 aprobadas |
+| Integración (`GenKeyPairTests`) | Generación RSA, certificados autofirmados, persistencia cifrada, CSR, ayuda, alias duplicado y contraseñas incorrectas | Operaciones correctas y errores controlados sin modificar el almacén ante fallos | Correcto: 50 pruebas, 50 aprobadas |
 | `storepasswd` | Contraseña válida/incorrecta, confirmación, conservación de claves y fallos de escritura | Cambio autenticado; conservar el almacén original ante errores | Correcto: 19 pruebas, 19 aprobadas |
 | `list` | Orden, filtro, metadatos públicos, alias ausente y autenticación | Listado estable sin exponer claves; errores controlados | Correcto: 18 pruebas, 18 aprobadas |
 | `gencert` | CSR PEM/DER, firma, vigencia, extensiones, entradas incorrectas y escritura atómica | Certificado verificable; no escribir salida parcial ante errores | Correcto: 20 pruebas, 20 aprobadas |
 | `exportcert` | DER/PEM, alias, contraseñas, salida atómica y protección del almacén | Exportar solo el certificado; preservar el almacén y la salida previa ante errores | Correcto: 7 pruebas, 7 aprobadas |
-| Suite completa | Descubrimiento de todos los módulos de prueba | Todas las pruebas importan y pasan | Correcto: 114 pruebas, 114 aprobadas, sin errores de importación |
+| Suite completa | Descubrimiento de todos los módulos de prueba | Todas las pruebas importan y pasan | Correcto: 120 pruebas, 120 aprobadas, sin errores de importación |
+
+### Cobertura mínima para la defensa
+
+Estos métodos se encuentran en `tests/test_mykeytool.py`. La tabla identifica
+pruebas concretas, no solo funcionalidades disponibles en la aplicación.
+
+| Requisito | Prueba automatizada | Comprobación |
+|---|---|---|
+| Ayuda y validación de argumentos | Clase `CliArgumentTests` | Ayuda general y específica; rechazo de argumentos inválidos antes de pedir datos o crear archivos |
+| RSA de 2048 bits | `test_generates_encrypted_rsa_2048_entry_and_dn` | Tipos RSA, tamaño exacto de 2048 bits, exponente 65537 y coincidencia del par |
+| Creación, carga y persistencia | `test_save_load_round_trip_uses_versioned_encrypted_format` y `test_preserves_existing_entries` | Cabecera versionada, contenido cifrado, recuperación de entradas y conservación de las anteriores |
+| Generación y validez del CSR PEM | `test_certreq_generates_valid_pem_with_expected_subject_and_public_key` | Cabeceras PEM, Base64 válido, firma SHA-256 válida, DN y clave pública del alias |
+| Contraseña incorrecta | `test_genkeypair_fails_after_one_wrong_store_password` y `test_certreq_rejects_wrong_alias_password_without_private_key_leak` | Un intento para el almacén, error controlado y ausencia de claves privadas en la salida |
+| Alias duplicado | `test_duplicate_alias_and_wrong_password_preserve_file` | Operación rechazada y archivo original conservado byte a byte |
+| Almacén inexistente o dañado | `test_certreq_reports_missing_or_damaged_keystore` y `test_tampered_or_invalid_store_is_not_overwritten` | Mensaje de error, ninguna solicitud parcial y almacén dañado sin sobrescribir |
+| Alias inexistente | `test_certreq_rejects_missing_alias_without_creating_output` | Error claro, ningún CSR creado y almacén intacto |
 
 La suite completa se ejecuta con:
 
 ```bash
 python -m unittest discover -s tests -v
+```
+
+Para una demostración centrada en la cobertura mínima, ejecuta solo el módulo de
+integración (56 pruebas, incluidas las seis de argumentos):
+
+```bash
+python -m unittest discover -s tests -p test_mykeytool.py -v
+```
+
+Para repetir únicamente la validación de argumentos y las ayudas:
+
+```bash
+python -m unittest discover -s tests -p test_mykeytool.py -k CliArgumentTests -v
+```
+
+Las pruebas usan `TemporaryDirectory` y registran su limpieza con `addCleanup`:
+los almacenes, CSR y certificados generados quedan fuera del repositorio y se
+eliminan también si falla una aserción. Las contraseñas de prueba son datos
+sintéticos; no se necesitan credenciales reales ni servicios de red.
+
+`-v` muestra el nombre de cada prueba y `unittest` presenta el traceback, la
+línea de la aserción y los valores comparados si falla. Los casos de argumentos
+incluyen la entrada y `stderr` en sus diagnósticos, y `subTest` identifica la
+variante que falló. Para depurar un caso, usa `-k` seguido de su nombre, por
+ejemplo:
+
+```bash
+python -m unittest discover -s tests -p test_mykeytool.py -k test_certreq_generates_valid_pem -v
 ```
 
 También se pueden repetir los módulos por separado:

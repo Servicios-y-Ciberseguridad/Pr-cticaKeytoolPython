@@ -21,7 +21,6 @@ from .keystore import (
     DN_FIELDS,
     UNKNOWN_DN_VALUE,
     KeyEntry,
-    ensure_crypto_available,
     load_keystore,
     save_keystore,
 )
@@ -30,12 +29,11 @@ MAX_PASSWORD_ATTEMPTS = 1
 MAX_ALIAS_ATTEMPTS = 3
 SUPPORTED_KEY_SIZES = (2048, 3072, 4096, 7680, 15360)
 
-
 def read_password(prompt: str) -> str:
     with warnings.catch_warnings():
-        warnings.simplefilter("error", getpass.GetPassWarning)
-        return getpass.getpass(prompt)
+        warnings.simplefilter("error", getpass.GetPassWarning);
 
+        return getpass.getpass(prompt);
 
 def read_required(prompt: str) -> str:
     value = input(prompt).strip()
@@ -63,7 +61,6 @@ def is_key_size_supported(keysize: int) -> bool:
     """Indica si el tamano RSA pertenece a la lista admitida."""
     return keysize in SUPPORTED_KEY_SIZES
 
-
 def resolve_key_size(keysize: int | None) -> int:
     if keysize is not None:
         if not is_key_size_supported(keysize):
@@ -84,7 +81,6 @@ def resolve_key_size(keysize: int | None) -> int:
             f"Error: tamano no valido; valores admitidos: {allowed}.",
             file=sys.stderr,
         )
-
 
 def parse_dname(dname: str) -> dict[str, str]:
     parts = [part.strip() for part in dname.split(",") if part.strip()]
@@ -144,29 +140,31 @@ def resolve_dname(dname: str | None) -> dict[str, str]:
         return parsed
     return read_dname_interactively()
 
+def is_same_password(pwrd: str, npwrd: str):
+    return pwrd == npwrd;
 
-def read_store_password(path: Path, storepass: str | None) -> str:
-    password = storepass if storepass is not None else read_password("Enter keystore password: ")
+def read_store_password(path: Path, spwrd: str | None) -> str:
+    password = spwrd if spwrd is not None else read_password("Enter keystore password: ");
+
     if not password:
-        raise ValueError("La contrasena no puede estar vacia.")
+        raise ValueError("La contrasena no puede estar vacia.");
+
     if not path.exists():
         if len(password) < 8:
-            raise ValueError("La contrasena debe tener al menos 8 caracteres.")
-        if storepass is None and read_password("Re-enter new password: ") != password:
-            raise ValueError("Las contrasenas no coinciden.")
-    return password
+            raise ValueError("La contrasena debe tener al menos 8 caracteres.");
+    
+        if spwrd is None and read_password("Re-enter new password: ") != password:
+            raise ValueError("Las contrasenas no coinciden.");
 
+    return password;
 
-def open_keystore_with_password(
-    path: Path, storepass: str | None
-) -> tuple[str, dict[str, KeyEntry]]:
+def open_keystore_with_password(path: Path, storepass: str | None) -> tuple[str, dict[str, KeyEntry]]:
     """Abre o crea el KeyStore con un unico intento por ejecucion."""
     if not path.exists():
         return read_store_password(path, storepass), {}
 
     password = read_store_password(path, storepass)
     return password, load_keystore(path, password)
-
 
 def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str:
     if keypass is not None:
@@ -181,7 +179,6 @@ def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str
     if read_password("Re-enter key password: ") != password:
         raise ValueError("Las contrasenas de la clave no coinciden.")
     return password
-
 
 def resolve_alias(alias: str | None) -> str:
     if alias is not None:
@@ -234,7 +231,6 @@ def handle_genkeypair(
 ) -> int:
     """Genera un par RSA y guarda la entrada en un almacen cifrado."""
     try:
-        ensure_crypto_available()
         algorithm = resolve_key_algorithm(keyalg)
         resolved_keysize = resolve_key_size(keysize)
         password, entries = open_keystore_with_password(path, storepass)

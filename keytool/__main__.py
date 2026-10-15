@@ -1,3 +1,3 @@
-from .mykeytool import main
+from .start import main
 
 raise SystemExit(main())

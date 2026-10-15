@@ -36,12 +36,10 @@ AES_GCM_TAG_SIZE = 16
 DN_FIELDS = ("CN", "OU", "O", "L", "ST", "C")
 UNKNOWN_DN_VALUE = "Unknown"
 
-
 class KeyEntry(TypedDict):
     private_key: str
     public_key: str
     dn: dict[str, str]
-
 
 def ensure_crypto_available() -> None:
     if CRYPTO_IMPORT_ERROR is not None:
@@ -49,17 +47,13 @@ def ensure_crypto_available() -> None:
             "No se pudo importar 'cryptography' con este interprete de Python."
         ) from CRYPTO_IMPORT_ERROR
 
-
 def derive_store_key(password: str, salt: bytes) -> bytes:
-    ensure_crypto_available()
     return Scrypt(salt=salt, length=32, n=2**17, r=8, p=1).derive(
         password.encode("utf-8")
     )
 
-
 def load_keystore(path: Path, password: str) -> dict[str, KeyEntry]:
     """Load and validate a version-1 AES-GCM encrypted keystore."""
-    ensure_crypto_available()
     try:
         data = path.read_bytes()
     except FileNotFoundError as exc:
@@ -170,7 +164,6 @@ def write_bytes_atomic(path: Path, data: bytes) -> None:
 
 def save_keystore(path: Path, password: str, entries: dict[str, KeyEntry]) -> None:
     """Cifra y guarda el KeyStore en su formato binario versionado."""
-    ensure_crypto_available()
     salt = os.urandom(STORE_SALT_SIZE)
     nonce = os.urandom(STORE_NONCE_SIZE)
     plaintext = json.dumps(entries, ensure_ascii=True).encode("utf-8")

@@ -70,7 +70,7 @@ Pr-cticaKeytoolPython/
 ├── keytool/              # Paquete de la aplicación
 │   ├── __init__.py
 │   ├── __main__.py       # Permite ejecutar python -m keytool
-│   ├── mykeytool.py      # CLI y enrutamiento de comandos
+│   ├── start.py          # CLI y enrutamiento de comandos
 │   ├── genkeypair.py     # Generacion RSA y flujo interactivo
 │   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
 │   ├── certreq.py        # Comando de solicitudes CSR
@@ -91,7 +91,7 @@ Pr-cticaKeytoolPython/
 El código de la aplicación se agrupa en el paquete `keytool/` y las pruebas
 permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 
-1. `keytool/mykeytool.py` interpreta argumentos y enruta los comandos.
+1. `keytool/start.py` interpreta argumentos y enruta los comandos.
 2. `keytool/genkeypair.py` recoge los datos, genera el par RSA y prepara la entrada.
 3. `keytool/certreq.py` recupera una entrada existente, firma el CSR y exporta el PEM.
 4. `keytool/changealias.py` valida las entradas y solicita renombrar un alias.

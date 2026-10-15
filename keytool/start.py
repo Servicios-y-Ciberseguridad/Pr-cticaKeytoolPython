@@ -1,11 +1,9 @@
 """Interfaz de linea de comandos para el simulador de Java Keytool."""
-
 from __future__ import annotations
 
 import argparse
 import getpass
 import os
-import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -52,25 +50,9 @@ from .keystore import (
     save_keystore,
 )
 
-
 def is_crypto_library_available() -> bool:
     """Indica si la dependencia cryptography esta disponible."""
-    return CRYPTO_IMPORT_ERROR is None
-
-
-def handoff_to_project_venv(argv: Sequence[str] | None) -> int | None:
-    """Reejecuta con el entorno del proyecto si falta cryptography."""
-    if is_crypto_library_available():
-        return None
-    project_root = Path(__file__).resolve().parent.parent
-    venv_python = project_root / ".venv" / "Scripts" / "python.exe"
-    current = Path(sys.executable).resolve()
-    if not venv_python.exists() or current == venv_python.resolve():
-        return None
-    entrypoint = project_root / "mykeytool.py"
-    command = [str(venv_python), str(entrypoint), *(argv or sys.argv[1:])]
-    return subprocess.run(command, check=False).returncode
-
+    return CRYPTO_IMPORT_ERROR is None;
 
 def print_genkeypair_help() -> None:
     print(
@@ -92,7 +74,6 @@ def print_genkeypair_help() -> None:
     allowed_sizes = ", ".join(map(str, SUPPORTED_KEY_SIZES))
     print(f"  -keysize KEYSIZE  valores admitidos: {allowed_sizes}", file=sys.stderr)
 
-
 def print_certreq_help() -> None:
     print(
         "usage: mykeytool.py -certreq [-keystore KEYSTORE] [-alias ALIAS] "
@@ -106,7 +87,6 @@ def print_certreq_help() -> None:
     print("  -storepass STOREPASS", file=sys.stderr)
     print("  -keypass KEYPASS", file=sys.stderr)
     print("  -file FILE        archivo .csr o .pem (por defecto: <alias>.csr)", file=sys.stderr)
-
 
 def print_changealias_help() -> None:
     print(
@@ -150,18 +130,19 @@ def print_main_help() -> None:
         file=sys.stdout,
     )
 
-
 def build_parser() -> argparse.ArgumentParser:
     """Construye y devuelve el analizador de argumentos de la aplicacion."""
     parser = argparse.ArgumentParser(
         prog="mykeytool.py",
         description=(
-            "Simulador en Python de las funciones esenciales de Java Keytool. "
+            "Simulador en Python de las funciones esenciales de Java Keytool."
             "Selecciona una operacion para gestionar el KeyStore."
         ),
         epilog="Ejemplo: python3 mykeytool.py --genkeypair",
-    )
-    commands = parser.add_mutually_exclusive_group(required=False)
+    );
+
+    commands = parser.add_mutually_exclusive_group(required=False);
+
     commands.add_argument(
         "-genkeypair",
         "--genkeypair",
@@ -169,7 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
         const="genkeypair",
         dest="command",
         help="genera un par de claves RSA y lo guarda en el KeyStore",
-    )
+    );
+
     commands.add_argument(
         "-certreq",
         "--certreq",
@@ -177,7 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
         const="certreq",
         dest="command",
         help="genera una solicitud de firma de certificado (CSR)",
-    )
+    );
+
     commands.add_argument(
         "-changealias",
         "--changealias",
@@ -185,7 +168,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="changealias",
         dest="command",
         help="cambia el alias de una entrada del KeyStore",
-    )
+    );
 
     commands.add_argument(
         "-list",
@@ -220,15 +203,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--file",
         type=Path,
         help="archivo .csr o .pem de salida para -certreq",
-    )
-    return parser
+    );
 
+    return parser;
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Procesa los argumentos y ejecuta el manejador del comando elegido."""
-    handoff_result = handoff_to_project_venv(argv)
-    if handoff_result is not None:
-        return handoff_result
+    if not is_crypto_library_available():
+        return -1;
 
     arg_list = list(argv if argv is not None else sys.argv[1:])
     if any(flag in arg_list for flag in ("-h", "--help")):
@@ -244,13 +226,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if any(flag in arg_list for flag in ("-list", "--list")):
             print_list_help()
             return 0
+    args = build_parser().parse_args(arg_list)
 
-    parser = build_parser()
-    args = parser.parse_args(arg_list)
     if args.command is None:
-        print_main_help()
-        return 0
+        print_main_help();
 
+        return 0;
+    
     if args.command == "genkeypair":
         return handle_genkeypair(
             args.keystore,
@@ -260,16 +242,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             dname=args.dname,
             keyalg=args.keyalg,
             keysize=args.keysize,
-        )
-
-    if args.command == "certreq":
+        );
+    elif args.command == "certreq":
         return handle_certreq(
             args.keystore,
             alias=args.alias,
             storepass=args.storepass,
             keypass=args.keypass,
             output=args.file,
-        )
+        );
 
     if args.command == "list":
         return handle_list(
@@ -284,8 +265,4 @@ def main(argv: Sequence[str] | None = None) -> int:
         alias=args.alias,
         destalias=args.destalias,
         storepass=args.storepass,
-    )
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    );

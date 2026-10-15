@@ -33,11 +33,9 @@ from .keystore import (
     DN_FIELDS,
     UNKNOWN_DN_VALUE,
     KeyEntry,
-    ensure_crypto_available,
     load_keystore,
     write_bytes_atomic,
 )
-
 
 # Los nombres se guardan como texto para que el modulo pueda cargarse incluso
 # cuando cryptography no este instalado; main intentara usar el entorno virtual.
@@ -163,8 +161,6 @@ def handle_certreq(
 ) -> int:
     """Carga un alias, firma su CSR y lo guarda como PEM."""
     try:
-        ensure_crypto_available()
-
         # 1. Autenticar el almacen y localizar la entrada.
         store_password, entries = open_existing_keystore(path, storepass)
         resolved_alias = resolve_alias(alias)

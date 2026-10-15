@@ -12,6 +12,7 @@ from pathlib import Path
 # pero cada responsabilidad se implementa en su modulo correspondiente.
 from .changealias import handle_changealias
 from .certreq import handle_certreq
+from .exportcert import handle_exportcert
 from .listing import handle_list
 from .storepasswd import handle_storepasswd
 from .gencert import DEFAULT_VALIDITY_DAYS, handle_gencert
@@ -90,6 +91,20 @@ def print_certreq_help() -> None:
     print("  -keypass KEYPASS", file=sys.stderr)
     print("  -file FILE        archivo .csr o .pem (por defecto: <alias>.csr)", file=sys.stderr)
 
+
+def print_exportcert_help() -> None:
+    print(
+        "usage: mykeytool.py -exportcert [-keystore KEYSTORE] [-storepass STOREPASS] "
+        "[-alias ALIAS] [-file FILE] [-rfc]",
+        file=sys.stderr,
+    )
+    print("  -keystore KEYSTORE  archivo del almacen", file=sys.stderr)
+    print("  -storepass STOREPASS se solicita sin eco si se omite", file=sys.stderr)
+    print("  -alias ALIAS        alias del certificado (se solicita si se omite)", file=sys.stderr)
+    print("  -file FILE          salida (por defecto: <alias>.cer)", file=sys.stderr)
+    print("  -rfc                salida PEM/Base64; por defecto DER binario", file=sys.stderr)
+
+
 def print_changealias_help() -> None:
     print(
         "usage: mykeytool.py -changealias [-keystore KEYSTORE] "
@@ -124,6 +139,7 @@ def print_main_help() -> None:
     print("Comandos disponibles:", file=sys.stdout)
     print("  -genkeypair, --genkeypair    genera un par de claves", file=sys.stdout)
     print("  -certreq, --certreq          genera una solicitud CSR", file=sys.stdout)
+    print("  -exportcert, --exportcert    exporta un certificado X.509", file=sys.stdout)
     print("  -gencert, --gencert          firma un certificado desde un CSR", file=sys.stdout)
     print("  -changealias, --changealias  cambia el alias de una entrada", file=sys.stdout)
     print("  -list, --list                lista las entradas del KeyStore", file=sys.stdout)
@@ -217,6 +233,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     commands.add_argument(
+        "-exportcert",
+        "--exportcert",
+        action="store_const",
+        const="exportcert",
+        dest="command",
+        help="exporta el certificado X.509 publico de un alias",
+    )
+
+    commands.add_argument(
         "-storepasswd",
         "--storepasswd",
         action="store_const",
@@ -264,7 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-file",
         "--file",
         type=Path,
-        help="archivo .csr o .pem de salida para -certreq",
+        help="archivo de salida para -certreq o -exportcert",
     );
 
     return parser;
@@ -281,6 +306,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if any(flag in arg_list for flag in ("-certreq", "--certreq")):
             print_certreq_help()
+            return 0
+        if any(flag in arg_list for flag in ("-exportcert", "--exportcert")):
+            print_exportcert_help()
             return 0
         if any(flag in arg_list for flag in ("-gencert", "--gencert")):
             print_gencert_help()
@@ -319,6 +347,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             keypass=args.keypass,
             output=args.file,
         );
+
+    if args.command == "exportcert":
+        return handle_exportcert(
+            args.keystore,
+            alias=args.alias,
+            storepass=args.storepass,
+            output=args.file,
+            rfc=args.rfc,
+        )
 
     if args.command == "gencert":
         return handle_gencert(

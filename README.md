@@ -10,11 +10,9 @@ Crear un programa Python que permita:
 
 - Generar pares de claves pública/privada.
 - Almacenar claves con alias identificativos.
-<<<<<<< HEAD
-=======
 - Generar solicitudes de firma de certificado (CSR) en formato PEM.
 - Firmar certificados X.509 desde solicitudes PKCS#10 en PEM o DER.
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
+- Exportar el certificado X.509 público asociado a un alias en DER o PEM.
 - Consultar desde Python la información de una entrada del KeyStore.
 - Simular funcionalidades básicas de `keytool` en un entorno de consola.
 
@@ -54,15 +52,12 @@ py -3.14 -m venv .venv
 pip install -r requirements.txt
 ```
 
-<<<<<<< HEAD
-=======
 La dependencia principal también puede instalarse directamente con:
 
 ```bash
 pip install cryptography
 ```
 
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 Si ya tienes un entorno creado con MSYS2 o MinGW, recrealo con el Python oficial de Windows para poder instalar `cryptography` sin errores de compatibilidad.
 
 ## Dependencias
@@ -73,12 +68,6 @@ Este proyecto usa la librería `cryptography`, que permite generar claves, certi
 
 ```text
 Pr-cticaKeytoolPython/
-<<<<<<< HEAD
-├── mykeytool.py          # CLI y enrutamiento de comandos
-├── genkeypair.py         # Generacion RSA y flujo interactivo
-├── keystore.py           # Cifrado, lectura y escritura del KeyStore
-├── certreq.py            # Comando de solicitudes CSR
-=======
 ├── mykeytool.py          # Punto de entrada compatible
 ├── keytool/              # Paquete de la aplicación
 │   ├── __init__.py
@@ -88,11 +77,11 @@ Pr-cticaKeytoolPython/
 │   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
 │   ├── certreq.py        # Comando de solicitudes CSR
 │   ├── gencert.py        # Emision X.509 a partir de un CSR
+│   ├── exportcert.py     # Exportacion autenticada de certificados publicos
 │   ├── changealias.py    # Cambio de alias de una entrada
 │   ├── storepasswd.py    # Cambio de contrasena del almacen
 │   ├── listing.py        # Listado autenticado de datos publicos
 │   └── errors.py         # Errores de dominio
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 ├── tests/
 │   └── test_mykeytool.py
 ├── README.md             # Documentación del proyecto
@@ -102,8 +91,6 @@ Pr-cticaKeytoolPython/
 └── .gitignore           # Archivos ignorados por Git
 ```
 
-<<<<<<< HEAD
-=======
 ### Explicación sencilla de la arquitectura
 
 El código de la aplicación se agrupa en el paquete `keytool/` y las pruebas
@@ -118,6 +105,8 @@ permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 7. `keytool/listing.py` lista alias y detalles públicos sin descifrar claves privadas.
 8. `keytool/storepasswd.py` autentica y cambia la contraseña del almacén.
 9. `keytool/gencert.py` valida el CSR y exporta un certificado firmado.
+10. `keytool/exportcert.py` exporta el certificado asociado a un alias sin acceder
+    a la clave privada.
 
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
@@ -133,7 +122,6 @@ almacén completo y `keypass` permite usar la clave privada de un alias. La clav
 privada solo se mantiene en memoria el tiempo necesario para firmar y nunca se
 escribe en el CSR.
 
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 ## Uso previsto
 
 Si ejecutas el programa sin parametros, muestra solo los comandos disponibles:
@@ -149,8 +137,6 @@ python mykeytool.py -genkeypair -h
 python mykeytool.py -genkeypair --help
 ```
 
-<<<<<<< HEAD
-=======
 La ayuda específica de `certreq` muestra sus opciones compatibles con el estilo de
 `keytool`:
 
@@ -158,16 +144,10 @@ La ayuda específica de `certreq` muestra sus opciones compatibles con el estilo
 python mykeytool.py -certreq --help
 ```
 
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 El flujo mas simple para generar un par de claves es:
 
 ```bash
 python mykeytool.py --genkeypair -keyalg RSA
-<<<<<<< HEAD
-python mykeytool.py --certreq
-```
-
-=======
 python mykeytool.py --certreq -keystore keystore.myks
 python mykeytool.py --changealias -keystore keystore.myks -alias mykey -destalias nuevaClave
 ```
@@ -178,19 +158,12 @@ solicita sin eco. El cambio conserva todos los datos de la entrada, incluida la
 clave privada en su forma cifrada y cualquier certificado asociado, sin pedir ni
 descifrar la contraseña de la clave privada.
 
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
 
 ```bash
 python mykeytool.py -genkeypair -alias mykey -keyalg RSA -keysize 2048 -dname "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES"
 ```
 
-<<<<<<< HEAD
-`--genkeypair` y `-genkeypair` aceptan parametros estilo `keytool`, pero tambien completan por consola los que falten. En el flujo interactivo actual se solicitan, segun falten:
-
-- `keyalg`
-- `keysize` con valor por defecto `2048`
-=======
 Cada nueva entrada incluye un certificado X.509 autofirmado en PEM, con el DN
 como sujeto y emisor, número de serie aleatorio, firma RSA/SHA-256 y vigencia de
 90 días desde su creación. No es un certificado de autoridad certificadora
@@ -271,9 +244,29 @@ confiable, con permisos y fechas apropiados.
 La salida se escribe de forma atómica y no puede sobrescribir el KeyStore ni el
 CSR de entrada. Un fallo previo al reemplazo conserva cualquier archivo de
 salida anterior. No se exportan claves privadas ni se modifica ninguna entrada
-del almacén. El resultado es un archivo X.509 estándar reutilizable para una
-futura importación o exportación: **esta operación no implementa `-exportcert`
-ni almacena automáticamente el certificado generado**.
+del almacén. El resultado es un archivo X.509 estándar reutilizable.
+
+### Exportar el certificado de un alias
+
+```powershell
+python mykeytool.py -exportcert -keystore keystore.myks -alias miClave -file certificado.der
+python -m keytool --exportcert -keystore keystore.myks -alias miClave -file certificado.pem -rfc
+python mykeytool.py -exportcert --help
+```
+
+`-exportcert` / `--exportcert` autentica el KeyStore y exporta únicamente el
+certificado X.509 público guardado en el alias. Acepta `-keystore KEYSTORE`,
+`-storepass STOREPASS`, `-alias ALIAS`, `-file FILE` y `-rfc`. Si se omite la
+contraseña, se solicita sin eco; si se omite el alias, se solicita de forma
+interactiva; y si se omite el archivo, se genera `<alias>.cer` con un nombre
+seguro. Por defecto se escribe DER binario; `-rfc` escribe PEM/Base64 con las
+cabeceras `BEGIN/END CERTIFICATE`. Ambos formatos contienen el mismo certificado.
+
+El comando no carga ni descifra la clave privada, no modifica el KeyStore y
+rechaza una salida que apunte al propio almacén, incluso mediante un enlace duro.
+La escritura es atómica. Un alias inexistente, un alias sin certificado, una
+contraseña incorrecta o un certificado guardado no válido produce un error
+claro sin traza.
 
 Con un emisor CA apropiado, se puede inspeccionar y verificar usando OpenSSL:
 
@@ -403,8 +396,6 @@ controlado y es necesario ejecutar de nuevo el comando.
 
 - `keyalg`
 - `keysize` con valor por defecto `2048`; admite `2048`, `3072`, `4096`, `7680`
-  y `15360`, y muestra estas opciones en el prompt
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 - contrasena del KeyStore
 - contrasena de la clave (`RETURN` reutiliza la del KeyStore)
 - alias con valor por defecto `mykey`
@@ -416,11 +407,7 @@ Ejemplo de flujo interactivo:
 
 ```text
 > python mykeytool.py -genkeypair -keyalg RSA
-<<<<<<< HEAD
-Enter key size [2048]:
-=======
 Enter key size (2048, 3072, 4096, 7680, 15360) [2048]:
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 Enter keystore password:
 Re-enter new password:
 Enter key alias [mykey]:
@@ -442,11 +429,7 @@ Is CN=Ana Perez, OU=Seguridad, O=Empresa, L=Madrid, ST=Madrid, C=ES correct? [no
 Exito: par RSA de 2048 bits guardado con alias 'mykey' en 'keystore.myks'.
 ```
 
-<<<<<<< HEAD
-La clave privada se guarda cifrada con `keypass`. Si `python` apunta a un interprete sin `cryptography`, el script intentara reejecutarse automaticamente con `.venv`. `--certreq` sigue siendo un marcador para la siguiente fase del proyecto.
-=======
 La clave privada se guarda cifrada con `keypass`. Si `python` apunta a un interprete sin `cryptography`, el script intentara reejecutarse automaticamente con `.venv`.
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 
 ### Formato y recuperación del KeyStore
 
@@ -492,8 +475,6 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 .\.venv\Scripts\python.exe .\mykeytool.py --genkeypair -keyalg RSA
 ```
 
-<<<<<<< HEAD
-=======
 ## Matriz de pruebas ejecutadas
 
 | Área | Verificación automatizada | Resultado esperado |
@@ -507,6 +488,7 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 | `list` | Almacén vacío, varios alias, orden estable, filtro, detalles públicos y errores | Listado autenticado, solo lectura y sin secretos |
 | `storepasswd` | Cambio correcto, reglas de longitud y confirmación, intento único, claves intactas y fallos de escritura/reemplazo | Contraseña nueva válida, anterior rechazada y archivo original conservado ante errores |
 | `gencert` | Firma SHA-256, sujeto, emisor, validez, CSR PEM/DER, extensiones, errores y escritura atómica | X.509 verificable con cryptography y OpenSSL, sin claves privadas ni cambios en el almacén |
+| `exportcert` | Exportación DER/PEM, autenticación, alias y archivo de salida | Certificado público válido sin leer claves privadas ni modificar el almacén |
 
 La suite completa se ejecuta con:
 
@@ -514,7 +496,6 @@ La suite completa se ejecuta con:
 python -m unittest discover -s tests -v
 ```
 
->>>>>>> ed6d4d7043288449400dd7abecd454423118cff7
 ## Nota
 
 Este repositorio está pensado como una práctica académica y puede ir ampliándose según el enunciado concreto del ejercicio.

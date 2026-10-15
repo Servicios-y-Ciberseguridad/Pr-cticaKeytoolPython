@@ -75,6 +75,7 @@ Pr-cticaKeytoolPython/
 │   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
 │   ├── certreq.py        # Comando de solicitudes CSR
 │   ├── changealias.py    # Cambio de alias de una entrada
+│   ├── listing.py        # Listado autenticado de datos publicos
 │   └── errors.py         # Errores de dominio
 ├── tests/
 │   └── test_mykeytool.py
@@ -96,6 +97,7 @@ permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 4. `keytool/changealias.py` valida las entradas y solicita renombrar un alias.
 5. `keytool/keystore.py` cifra, valida, lee y escribe el almacén.
 6. `keytool/errors.py` define los errores de dominio compartidos.
+7. `keytool/listing.py` lista alias y detalles públicos sin descifrar claves privadas.
 
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
@@ -152,6 +154,33 @@ Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
 ```bash
 python mykeytool.py -genkeypair -alias mykey -keyalg RSA -keysize 2048 -dname "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES"
 ```
+
+### Consultar las entradas
+
+```bash
+python mykeytool.py -list -keystore keystore.myks
+python mykeytool.py --list -keystore keystore.myks -alias mykey --verbose
+python mykeytool.py -list -v
+python mykeytool.py -list --help
+```
+
+`-list` / `--list` autentica el almacén antes de mostrar información. Acepta
+`-storepass`, pero es preferible omitirlo para introducir la contraseña sin eco.
+No solicita `keypass`, no descifra claves privadas ni modifica el archivo.
+Sin `-alias`, muestra el número de entradas y todos los alias ordenados por su
+texto (distinguiendo mayúsculas); un almacén vacío muestra `Entradas: 0`.
+Con `-alias`, muestra únicamente esa entrada, o un error si no existe.
+Los alias y DN se representan como cadenas entre comillas con escapes para
+evitar que saltos de línea o caracteres de control alteren la salida.
+
+`-v` / `--verbose` añade el DN, el algoritmo RSA y el tamaño en bits de la clave
+pública. Si la entrada contiene `certificate` como certificado X.509 en PEM,
+también muestra sujeto, emisor, número de serie, vigencia UTC, OID del algoritmo
+de firma y huella SHA-256. Si no existe, indica que no está disponible.
+Los datos públicos malformados en modo detallado generan un error sin salida
+parcial. No se vuelcan entradas, claves privadas, contraseñas, salt, nonce ni
+etiquetas de autenticación. Un alias inexistente, contraseña incorrecta o
+almacén dañado produce código de salida 1 con un mensaje claro y sin traza.
 
 Para generar un CSR a partir de una entrada existente:
 
@@ -278,6 +307,7 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 | Privacidad | Inspección del PEM y de los mensajes de consola | No aparece ninguna clave privada ni contraseña |
 | Errores de CSR | Alias inexistente, contraseña de almacén/clave incorrecta y almacén dañado | Código de salida 1, sin traceback ni archivo parcial |
 | CLI | Ayuda general y ayuda específica de ambos comandos | Opciones y sintaxis visibles |
+| `list` | Almacén vacío, varios alias, orden estable, filtro, detalles públicos y errores | Listado autenticado, solo lectura y sin secretos |
 
 La suite completa se ejecuta con:
 

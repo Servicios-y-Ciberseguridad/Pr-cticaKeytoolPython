@@ -14,6 +14,7 @@ from pathlib import Path
 # pero cada responsabilidad se implementa en su modulo correspondiente.
 from .changealias import handle_changealias
 from .certreq import handle_certreq
+from .listing import handle_list
 from .genkeypair import (
     MAX_ALIAS_ATTEMPTS,
     MAX_PASSWORD_ATTEMPTS,
@@ -121,6 +122,20 @@ def print_changealias_help() -> None:
     print("  -destalias DESTALIAS alias nuevo", file=sys.stderr)
 
 
+def print_list_help() -> None:
+    print(
+        "usage: mykeytool.py -list [-keystore KEYSTORE] [-storepass STOREPASS] "
+        "[-alias ALIAS] [-v | --verbose]",
+        file=sys.stderr,
+    )
+    print("", file=sys.stderr)
+    print("Optional for -list / --list:", file=sys.stderr)
+    print("  -keystore KEYSTORE", file=sys.stderr)
+    print("  -storepass STOREPASS  se solicita sin eco si se omite", file=sys.stderr)
+    print("  -alias ALIAS          limita la consulta a una entrada", file=sys.stderr)
+    print("  -v, --verbose         muestra detalles publicos", file=sys.stderr)
+
+
 def print_main_help() -> None:
     print("usage: mykeytool.py [command]", file=sys.stdout)
     print("", file=sys.stdout)
@@ -128,6 +143,7 @@ def print_main_help() -> None:
     print("  -genkeypair, --genkeypair    genera un par de claves", file=sys.stdout)
     print("  -certreq, --certreq          genera una solicitud CSR", file=sys.stdout)
     print("  -changealias, --changealias  cambia el alias de una entrada", file=sys.stdout)
+    print("  -list, --list                lista las entradas del KeyStore", file=sys.stdout)
     print("", file=sys.stdout)
     print(
         "Usa 'mykeytool.py <comando> -h' para ver sus argumentos.",
@@ -171,6 +187,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="cambia el alias de una entrada del KeyStore",
     )
 
+    commands.add_argument(
+        "-list",
+        "--list",
+        action="store_const",
+        const="list",
+        dest="command",
+        help="lista las entradas del KeyStore tras autenticarlo",
+    )
+
     parser.add_argument(
         "-keystore",
         "--keystore",
@@ -179,6 +204,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="archivo del almacen propio cifrado (por defecto: keystore.myks)",
     )
     parser.add_argument("-alias", help="alias de la entrada")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="detalles publicos para -list"
+    )
     parser.add_argument("-destalias", help="alias nuevo para -changealias")
     parser.add_argument(
         "-dname", help="DN en formato CN=..., OU=..., O=..., L=..., ST=..., C=..."
@@ -213,6 +241,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if any(flag in arg_list for flag in ("-changealias", "--changealias")):
             print_changealias_help()
             return 0
+        if any(flag in arg_list for flag in ("-list", "--list")):
+            print_list_help()
+            return 0
 
     parser = build_parser()
     args = parser.parse_args(arg_list)
@@ -238,6 +269,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             storepass=args.storepass,
             keypass=args.keypass,
             output=args.file,
+        )
+
+    if args.command == "list":
+        return handle_list(
+            args.keystore,
+            alias=args.alias,
+            storepass=args.storepass,
+            verbose=args.verbose,
         )
 
     return handle_changealias(

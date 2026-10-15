@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import getpass
-import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -17,40 +15,13 @@ from .listing import handle_list
 from .storepasswd import handle_storepasswd
 from .gencert import DEFAULT_VALIDITY_DAYS, handle_gencert
 from .genkeypair import (
-    MAX_ALIAS_ATTEMPTS,
-    MAX_PASSWORD_ATTEMPTS,
     SUPPORTED_KEY_SIZES,
     handle_genkeypair,
-    is_key_size_supported,
-    open_keystore_with_password,
-    parse_dname,
-    read_dname_interactively,
-    read_password,
-    read_required,
-    read_store_password,
-    resolve_alias,
-    resolve_dname,
-    resolve_key_algorithm,
-    resolve_key_password,
-    resolve_key_size,
-    resolve_unique_alias,
-    validate_country,
 )
+
 from .keystore import (
-    AES_GCM_TAG_SIZE,
     CRYPTO_IMPORT_ERROR,
     DEFAULT_KEYSTORE,
-    DN_FIELDS,
-    STORE_HEADER,
-    STORE_NONCE_SIZE,
-    STORE_SALT_SIZE,
-    UNKNOWN_DN_VALUE,
-    KeyEntry,
-    derive_store_key,
-    ensure_crypto_available,
-    load_keystore,
-    load_keystore_entry,
-    save_keystore,
 )
 
 def is_crypto_library_available() -> bool:

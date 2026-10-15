@@ -5,16 +5,22 @@ from __future__ import annotations
 import getpass
 import sys
 import warnings
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .errors import DuplicateAliasError, KeytoolError
 
 try:
-    from cryptography.hazmat.primitives import serialization
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
 except ModuleNotFoundError:
+    x509 = None
+    hashes = None
     serialization = None
     rsa = None
+    NameOID = None
 
 from .keystore import (
     DEFAULT_KEYSTORE,
@@ -28,6 +34,45 @@ from .keystore import (
 MAX_PASSWORD_ATTEMPTS = 1
 MAX_ALIAS_ATTEMPTS = 3
 SUPPORTED_KEY_SIZES = (2048, 3072, 4096, 7680, 15360)
+CERTIFICATE_VALIDITY_DAYS = 90
+DN_OIDS = {
+    "CN": "COMMON_NAME",
+    "OU": "ORGANIZATIONAL_UNIT_NAME",
+    "O": "ORGANIZATION_NAME",
+    "L": "LOCALITY_NAME",
+    "ST": "STATE_OR_PROVINCE_NAME",
+    "C": "COUNTRY_NAME",
+}
+
+
+def build_subject(dn: dict[str, str]) -> x509.Name:
+    """Construye el sujeto compartido por certificados y solicitudes CSR."""
+    attributes = []
+    for field in DN_FIELDS:
+        value = dn[field]
+        if field == "C" and value == UNKNOWN_DN_VALUE:
+            continue
+        oid = getattr(NameOID, DN_OIDS[field])
+        attributes.append(x509.NameAttribute(oid, value))
+    return x509.Name(attributes)
+
+
+def build_self_signed_certificate(
+    private_key: rsa.RSAPrivateKey, dn: dict[str, str]
+) -> x509.Certificate:
+    subject = build_subject(dn)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=CERTIFICATE_VALIDITY_DAYS))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .sign(private_key, hashes.SHA256())
+    )
 
 def read_password(prompt: str) -> str:
     with warnings.catch_warnings():
@@ -240,6 +285,7 @@ def handle_genkeypair(
         private_key = rsa.generate_private_key(
             public_exponent=65537, key_size=resolved_keysize
         )
+        certificate = build_self_signed_certificate(private_key, dn)
         entries[alias] = KeyEntry(
             private_key=private_key.private_bytes(
                 serialization.Encoding.PEM,
@@ -251,6 +297,7 @@ def handle_genkeypair(
                 serialization.PublicFormat.SubjectPublicKeyInfo,
             ).decode("ascii"),
             dn=dn,
+            certificate=certificate.public_bytes(serialization.Encoding.PEM).decode("ascii"),
         )
         save_keystore(path, password, entries)
     except getpass.GetPassWarning:

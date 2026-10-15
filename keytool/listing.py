@@ -24,7 +24,21 @@ except ModuleNotFoundError:
     rsa = None
 
 
-def public_entry_details(entry: KeyEntry) -> list[str]:
+def load_entry_certificate(entry: KeyEntry) -> x509.Certificate | None:
+    certificate_pem = entry.get("certificate")
+    if certificate_pem is None:
+        return None
+    if not isinstance(certificate_pem, str):
+        raise InvalidKeystoreError("Certificado del KeyStore no valido.")
+    try:
+        return x509.load_pem_x509_certificate(certificate_pem.encode("ascii"))
+    except (ValueError, UnsupportedAlgorithm) as exc:
+        raise InvalidKeystoreError("Certificado del KeyStore no valido.") from exc
+
+
+def public_entry_details(
+    entry: KeyEntry, certificate: x509.Certificate | None
+) -> list[str]:
     """Formatea solo metadatos publicos, nunca el contenido de la entrada."""
     try:
         public_key = serialization.load_pem_public_key(
@@ -41,16 +55,9 @@ def public_entry_details(entry: KeyEntry) -> list[str]:
         "  Algoritmo: RSA",
         f"  Tamano de clave publica: {public_key.key_size} bits",
     ]
-    certificate_pem = entry.get("certificate")
-    if certificate_pem is None:
+    if certificate is None:
         lines.append("  Certificado: no disponible")
         return lines
-    if not isinstance(certificate_pem, str):
-        raise InvalidKeystoreError("Certificado del KeyStore no valido.")
-    try:
-        certificate = x509.load_pem_x509_certificate(certificate_pem.encode("ascii"))
-    except (ValueError, UnsupportedAlgorithm) as exc:
-        raise InvalidKeystoreError("Certificado del KeyStore no valido.") from exc
     lines.extend([
         f"  Sujeto: {json.dumps(certificate.subject.rfc4514_string(), ensure_ascii=True)}",
         f"  Emisor: {json.dumps(certificate.issuer.rfc4514_string(), ensure_ascii=True)}",
@@ -58,7 +65,6 @@ def public_entry_details(entry: KeyEntry) -> list[str]:
         f"  Valido desde: {certificate.not_valid_before_utc.isoformat()}",
         f"  Valido hasta: {certificate.not_valid_after_utc.isoformat()}",
         f"  Algoritmo de firma (OID): {certificate.signature_algorithm_oid.dotted_string}",
-        f"  Huella SHA-256: {certificate.fingerprint(hashes.SHA256()).hex().upper()}",
     ])
     return lines
 
@@ -86,11 +92,29 @@ def handle_list(
         else:
             aliases = sorted(entries)
 
-        lines = [f"Entradas: {len(aliases)}"]
+        count = len(aliases)
+        noun = "entry" if count == 1 else "entries"
+        lines = [
+            "Keystore type: MYKEYSTORE (version 1)",
+            "Keystore provider: Python cryptography",
+            "",
+            f"Your keystore contains {count} {noun}",
+        ]
         for name in aliases:
-            lines.append(f"Alias: {json.dumps(name, ensure_ascii=True)}")
+            entry = entries[name]
+            certificate = load_entry_certificate(entry)
+            display_name = json.dumps(name, ensure_ascii=True)[1:-1]
+            lines.extend([
+                "",
+                f"{display_name}, creation date unavailable, PrivateKeyEntry,",
+            ])
+            if certificate is None:
+                fingerprint = "unavailable (no certificate)"
+            else:
+                fingerprint = certificate.fingerprint(hashes.SHA256()).hex(":").upper()
+            lines.append(f"Certificate fingerprint (SHA-256): {fingerprint}")
             if verbose:
-                lines.extend(public_entry_details(entries[name]))
+                lines.extend(public_entry_details(entry, certificate))
     except getpass.GetPassWarning:
         print(
             "Error: no hay un terminal disponible para ocultar la contrasena.",

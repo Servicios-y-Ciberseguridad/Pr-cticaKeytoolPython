@@ -155,6 +155,22 @@ Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
 python mykeytool.py -genkeypair -alias mykey -keyalg RSA -keysize 2048 -dname "CN=Ana, OU=TI, O=Empresa, L=Madrid, ST=Madrid, C=ES"
 ```
 
+Cada nueva entrada incluye un certificado X.509 autofirmado en PEM, con el DN
+como sujeto y emisor, número de serie aleatorio, firma RSA/SHA-256 y vigencia de
+90 días desde su creación. No es un certificado de autoridad certificadora
+(`CA=false`) ni proporciona confianza pública por sí mismo. Se guarda dentro
+del KeyStore cifrado y `-list` muestra automáticamente su huella SHA-256.
+La clave privada sigue cifrada con `keypass`.
+
+Las entradas anteriores sin certificado siguen siendo compatibles; no se
+modifican automáticamente. Para probarlo, genera un alias nuevo y consúltalo:
+
+```bash
+python -m keytool -genkeypair -alias nuevaClave -keyalg RSA -keysize 2048
+python -m keytool -list -alias nuevaClave
+python -m keytool -list -alias nuevaClave -v
+```
+
 ### Consultar las entradas
 
 ```bash
@@ -168,17 +184,39 @@ python mykeytool.py -list --help
 `-storepass`, pero es preferible omitirlo para introducir la contraseña sin eco.
 No solicita `keypass`, no descifra claves privadas ni modifica el archivo.
 Sin `-alias`, muestra el número de entradas y todos los alias ordenados por su
-texto (distinguiendo mayúsculas); un almacén vacío muestra `Entradas: 0`.
+texto (distinguiendo mayúsculas); un almacén vacío muestra
+`Your keystore contains 0 entries`.
 Con `-alias`, muestra únicamente esa entrada, o un error si no existe.
-Los alias y DN se representan como cadenas entre comillas con escapes para
+Los alias se representan sin comillas y los DN entre comillas, con escapes para
 evitar que saltos de línea o caracteres de control alteren la salida.
+
+La salida sigue el estilo de Java Keytool, pero identifica el formato propio
+`MYKEYSTORE (version 1)` y la implementación `Python cryptography`, no PKCS12/SUN:
+
+```text
+Keystore type: MYKEYSTORE (version 1)
+Keystore provider: Python cryptography
+
+Your keystore contains 1 entry
+
+mykey, creation date unavailable, PrivateKeyEntry,
+Certificate fingerprint (SHA-256): unavailable (no certificate)
+```
+
+No se almacena una fecha de creación por entrada, por lo que se indica que no
+está disponible; no se sustituye por la fecha del archivo ni la del certificado.
+Si hay certificado, el listado básico muestra su huella SHA-256 en hexadecimal
+mayúsculo separado por dos puntos. No se usa la huella de la clave pública como
+si fuera la del certificado. `PrivateKeyEntry` identifica las entradas con clave
+privada cifrada que admite actualmente este almacén.
 
 `-v` / `--verbose` añade el DN, el algoritmo RSA y el tamaño en bits de la clave
 pública. Si la entrada contiene `certificate` como certificado X.509 en PEM,
 también muestra sujeto, emisor, número de serie, vigencia UTC, OID del algoritmo
 de firma y huella SHA-256. Si no existe, indica que no está disponible.
-Los datos públicos malformados en modo detallado generan un error sin salida
-parcial. No se vuelcan entradas, claves privadas, contraseñas, salt, nonce ni
+Un certificado malformado genera un error incluso en modo básico, ya que no se
+puede calcular su huella; una clave pública malformada genera un error en modo
+detallado. No hay salida parcial. No se vuelcan entradas, claves privadas, contraseñas, salt, nonce ni
 etiquetas de autenticación. Un alias inexistente, contraseña incorrecta o
 almacén dañado produce código de salida 1 con un mensaje claro y sin traza.
 

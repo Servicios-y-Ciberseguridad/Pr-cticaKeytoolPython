@@ -18,6 +18,7 @@ Crear un programa Python que permita:
 - Generar solicitudes de firma de certificado (CSR) en formato PEM.
 - Firmar certificados X.509 desde solicitudes PKCS#10 en PEM o DER.
 - Exportar el certificado X.509 público asociado a un alias en DER o PEM.
+- Eliminar una entrada del KeyStore mediante su alias.
 - Consultar desde Python la información de una entrada del KeyStore.
 - Simular funcionalidades básicas de `keytool` en un entorno de consola.
 
@@ -110,11 +111,13 @@ Pr-cticaKeytoolPython/
 │   ├── gencert.py        # Emision X.509 a partir de un CSR
 │   ├── exportcert.py     # Exportacion autenticada de certificados publicos
 │   ├── changealias.py    # Cambio de alias de una entrada
+│   ├── deletekey.py      # Eliminacion de una entrada
 │   ├── storepasswd.py    # Cambio de contrasena del almacen
 │   ├── listing.py        # Listado autenticado de datos publicos
 │   └── errors.py         # Errores de dominio
 ├── tests/
 │   ├── test_exportcert.py
+│   ├── test_deletekey.py
 │   ├── test_gencert.py
 │   ├── test_listing.py
 │   ├── test_mykeytool.py
@@ -140,6 +143,7 @@ permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 9. `keytool/gencert.py` valida el CSR y exporta un certificado firmado.
 10. `keytool/exportcert.py` exporta el certificado asociado a un alias sin acceder
     a la clave privada.
+11. `keytool/deletekey.py` elimina una entrada autenticando el KeyStore.
 
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
@@ -174,13 +178,14 @@ escribe en el CSR.
 python mykeytool.py --help
 python mykeytool.py --genkeypair --help
 python mykeytool.py --certreq --help
+python mykeytool.py --delete --help
 ```
 
 Ejemplo de salida real de la ayuda general:
 
 ```text
 > python mykeytool.py --help
-usage: mykeytool.py [-h] [-genkeypair | -certreq | -changealias | -list |
+usage: mykeytool.py [-h] [-genkeypair | -certreq | -changealias | -delete | -list |
                     -exportcert | -storepasswd | -gencert] ...
 ...
 options:
@@ -252,6 +257,23 @@ siguen siendo compatibles.
 `-alias` o `-destalias`, los solicita de forma interactiva; la contraseña se
 solicita sin eco. El cambio conserva los datos de la entrada, incluida la clave
 privada cifrada y los certificados asociados.
+
+### Eliminar una entrada del KeyStore
+
+```bash
+python mykeytool.py -delete -keystore keystore.myks -alias demo
+python -m keytool --delete -keystore keystore.myks -alias demo
+python mykeytool.py --delete --help
+```
+
+`-delete` / `--delete` elimina de forma permanente la entrada indicada por
+`-alias` después de autenticar el KeyStore con `-storepass`. Si se omite la
+contraseña, se solicita sin eco; si se omite el alias, se solicita por consola.
+La operación solo elimina el alias elegido, conserva las demás entradas y
+actualiza el archivo de forma atómica. No descifra las claves privadas ni
+elimina el archivo del KeyStore. Un alias vacío o inexistente, una contraseña
+incorrecta o un almacén inexistente se informa como error y deja el almacén
+intacto.
 
 ### Emitir un certificado desde un CSR
 
@@ -633,6 +655,7 @@ python -m unittest discover -s tests -p test_storepasswd.py -v
 python -m unittest discover -s tests -p test_listing.py -v
 python -m unittest discover -s tests -p test_gencert.py -v
 python -m unittest discover -s tests -p test_exportcert.py -v
+python -m unittest discover -s tests -p test_deletekey.py -v
 ```
 
 ## Nota

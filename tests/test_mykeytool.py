@@ -30,7 +30,7 @@ from keytool.genkeypair import build_subject
 class CliArgumentTests(unittest.TestCase):
     commands = (
         "genkeypair", "certreq", "changealias", "list",
-        "exportcert", "storepasswd", "gencert",
+        "delete", "exportcert", "storepasswd", "gencert",
     )
 
     def setUp(self):

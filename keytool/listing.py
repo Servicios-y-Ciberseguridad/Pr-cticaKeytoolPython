@@ -27,13 +27,15 @@ except ModuleNotFoundError:
 def load_entry_certificate(entry: KeyEntry) -> x509.Certificate | None:
     certificate_pem = entry.get("certificate")
     if certificate_pem is None:
-        return None
+        return None;
+
     if not isinstance(certificate_pem, str):
-        raise InvalidKeystoreError("Certificado del KeyStore no valido.")
+        raise InvalidKeystoreError("Certificado del KeyStore no valido.");
+
     try:
-        return x509.load_pem_x509_certificate(certificate_pem.encode("ascii"))
+        return x509.load_pem_x509_certificate(certificate_pem.encode("ascii"));
     except (ValueError, UnsupportedAlgorithm) as exc:
-        raise InvalidKeystoreError("Certificado del KeyStore no valido.") from exc
+        raise InvalidKeystoreError("Certificado del KeyStore no valido.") from exc;
 
 
 def public_entry_details(
@@ -78,7 +80,6 @@ def handle_list(
 ) -> int:
     """Lista entradas sin descifrar sus claves privadas ni modificar el archivo."""
     try:
-        ensure_crypto_available()
         _, entries = open_existing_keystore(path, storepass)
         if alias is not None:
             resolved_alias = alias.strip()

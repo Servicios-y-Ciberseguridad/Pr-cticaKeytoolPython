@@ -46,10 +46,12 @@ class KeyEntry(RequiredKeyEntry, total=False):
     certificate: str
 
 def ensure_crypto_available() -> None:
+    """Comprueba que la dependencia criptografica esta disponible."""
     if CRYPTO_IMPORT_ERROR is not None:
         raise ModuleNotFoundError(
             "No se pudo importar 'cryptography' con este interprete de Python."
         ) from CRYPTO_IMPORT_ERROR
+
 
 def derive_store_key(password: str, salt: bytes) -> bytes:
     return Scrypt(salt=salt, length=32, n=2**17, r=8, p=1).derive(
@@ -149,6 +151,22 @@ def change_keystore_alias(
     save_keystore(path, password, entries)
 
 
+def delete_keystore_entry(path: Path, password: str, alias: str) -> None:
+    """Elimina una entrada y vuelve a cifrar el KeyStore sin descifrar su clave."""
+    normalized_alias = alias.strip()
+    if not normalized_alias:
+        raise ValueError("El alias no puede estar vacio.")
+
+    entries = load_keystore(path, password)
+    try:
+        del entries[normalized_alias]
+    except KeyError as exc:
+        raise AliasNotFoundError(
+            f"No existe el alias '{normalized_alias}' en el KeyStore."
+        ) from exc
+    save_keystore(path, password, entries)
+
+
 def write_bytes_atomic(path: Path, data: bytes) -> None:
     """Escribe bytes completos y reemplaza el destino solo al terminar."""
     temporary_path: Path | None = None
@@ -171,7 +189,6 @@ def save_keystore(path: Path, password: str, entries: dict[str, KeyEntry]) -> No
     salt = os.urandom(STORE_SALT_SIZE)
     nonce = os.urandom(STORE_NONCE_SIZE)
     plaintext = json.dumps(entries, ensure_ascii=True).encode("utf-8")
-    ciphertext = AESGCM(derive_store_key(password, salt)).encrypt(
-        nonce, plaintext, STORE_HEADER
-    )
+    ciphertext = AESGCM(derive_store_key(password, salt)).encrypt(nonce, plaintext, STORE_HEADER)
+
     write_bytes_atomic(path, STORE_HEADER + salt + nonce + ciphertext)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 # pero cada responsabilidad se implementa en su modulo correspondiente.
 from .changealias import handle_changealias;
 from .certreq import handle_certreq;
+from .deletekey import handle_deletekey;
 from .exportcert import handle_exportcert;
 from .listing import handle_list;
 from .storepasswd import handle_storepasswd;
@@ -81,6 +83,18 @@ def print_changealias_help() -> None:
     print("  -alias ALIAS        alias actual", file=sys.stderr)
     print("  -destalias DESTALIAS alias nuevo", file=sys.stderr)
 
+def print_delete_help() -> None:
+    print(
+        "usage: mykeytool.py -delete [-keystore KEYSTORE] "
+        "[-storepass STOREPASS] [-alias ALIAS]",
+        file=sys.stderr,
+    )
+    print("", file=sys.stderr)
+    print("Optional for -delete / --delete:", file=sys.stderr)
+    print("  -keystore KEYSTORE", file=sys.stderr)
+    print("  -storepass STOREPASS  se solicita sin eco si se omite", file=sys.stderr)
+    print("  -alias ALIAS          se solicita si se omite", file=sys.stderr)
+
 def print_list_help() -> None:
     print(
         "usage: mykeytool.py -list [-keystore KEYSTORE] [-storepass STOREPASS] "
@@ -103,6 +117,7 @@ def print_main_help() -> None:
     print("  -exportcert, --exportcert    exporta un certificado X.509", file=sys.stdout)
     print("  -gencert, --gencert          firma un certificado desde un CSR", file=sys.stdout)
     print("  -changealias, --changealias  cambia el alias de una entrada", file=sys.stdout)
+    print("  -delete, --delete            elimina una entrada del KeyStore", file=sys.stdout)
     print("  -list, --list                lista las entradas del KeyStore", file=sys.stdout)
     print("  -storepasswd, --storepasswd  cambia la contrasena del KeyStore", file=sys.stdout)
     print("", file=sys.stdout)
@@ -147,7 +162,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mykeytool.py",
         description=(
-            "Simulador en Python de las funciones esenciales de Java Keytool."
+            "Simulador en Python de las funciones esenciales de Java Keytool. "
             "Selecciona una operacion para gestionar el KeyStore."
         ),
         epilog="Ejemplo: python3 mykeytool.py --genkeypair",
@@ -180,6 +195,15 @@ def build_parser() -> argparse.ArgumentParser:
         const="changealias",
         dest="command",
         help="cambia el alias de una entrada del KeyStore",
+    );
+
+    commands.add_argument(
+        "-delete",
+        "--delete",
+        action="store_const",
+        const="deletekey",
+        dest="command",
+        help="elimina una entrada del KeyStore",
     );
 
     commands.add_argument(
@@ -252,7 +276,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Procesa los argumentos y ejecuta el manejador del comando elegido."""
     if not is_crypto_library_available():
-        return -1;
+        raise ModuleNotFoundError(
+            "No se pudo importar 'cryptography' con este interprete de Python."
+        ) from CRYPTO_IMPORT_ERROR
 
     arg_list = list(argv if argv is not None else sys.argv[1:]);
 
@@ -279,6 +305,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     
         if any(flag in arg_list for flag in ("-changealias", "--changealias")):
             print_changealias_help();
+
+            return 0;
+
+        if any(flag in arg_list for flag in ("-delete", "--delete")):
+            print_delete_help();
 
             return 0;
     
@@ -309,7 +340,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             keyalg=args.keyalg,
             keysize=args.keysize,
         );
-    elif args.command == "certreq":
+    
+    if args.command == "certreq":
         return handle_certreq(
             args.keystore,
             alias=args.alias,
@@ -317,7 +349,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             keypass=args.keypass,
             output=args.file,
         );
-
+    
     if args.command == "exportcert":
         return handle_exportcert(
             args.keystore,
@@ -326,7 +358,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             output=args.file,
             rfc=args.rfc,
         );
-
+    
     if args.command == "gencert":
         return handle_gencert(
             args.keystore,
@@ -338,20 +370,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             rfc=args.rfc,
             validity=args.validity,
         );
-
+    
     if args.command == "storepasswd":
         return handle_storepasswd(
             args.keystore,
             storepass=args.storepass,
             new_password=args.new_password,
         );
-
+    
     if args.command == "list":
         return handle_list(
             args.keystore,
             alias=args.alias,
             storepass=args.storepass,
             verbose=args.verbose,
+        );
+
+    if args.command == "deletekey":
+        return handle_deletekey(
+            args.keystore,
+            alias=args.alias,
+            storepass=args.storepass,
         );
 
     return handle_changealias(

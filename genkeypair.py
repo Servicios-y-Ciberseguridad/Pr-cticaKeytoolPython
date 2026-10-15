@@ -24,45 +24,42 @@ from keystore import (
     save_keystore,
 )
 
-MAX_PASSWORD_ATTEMPTS = 3
-MAX_ALIAS_ATTEMPTS = 3
-
+MAX_PASSWORD_ATTEMPTS = 3;
+MAX_ALIAS_ATTEMPTS = 3;
 
 def read_password(prompt: str) -> str:
     with warnings.catch_warnings():
-        warnings.simplefilter("error", getpass.GetPassWarning)
-        return getpass.getpass(prompt)
+        warnings.simplefilter("error", getpass.GetPassWarning);
 
+        return getpass.getpass(prompt);
 
-def read_required(prompt: str) -> str:
-    value = input(prompt).strip()
-    if not value:
-        raise ValueError("Los campos solicitados no pueden estar vacios.")
-    return value
-
+def read_prompt(prompt: str) -> str:
+    return input(prompt).strip();
 
 def resolve_key_algorithm(keyalg: str | None) -> str:
-    value = keyalg.strip() if keyalg is not None else read_required("Enter key algorithm: ")
-    algorithm = value.upper()
-    if algorithm != "RSA":
-        raise ValueError("Solo se admite -keyalg RSA en esta implementacion.")
-    return algorithm
+    while keyalg.upper() != "RSA":
+        print("Solo se admite -keyalg RSA en esta implementacion.");
 
+        keyalg = read_prompt("Enter key algorithm: ");
 
-def resolve_key_size(keysize: int | None) -> int:
-    if keysize is not None:
-        resolved = keysize
-    else:
-        entered = input("Enter key size [2048]: ").strip()
-        resolved = 2048 if entered == "" else int(entered)
-    if resolved < 1024:
-        raise ValueError("-keysize debe ser un entero de al menos 1024 bits.")
-    return resolved
+    return keyalg.upper();
 
+def is_key_size_correct(ksize: int) -> bool:
+    return ksize is 2048 or ksize is 3072 or ksize is 4096 or ksize is 7680 or ksize is 15360;
+
+def resolve_key_size(keysize: int) -> int:
+    while not is_key_size_correct(keysize):
+        print("Tamaño de llave invalido (2048, 3072, 4096, 7680, 15360)");
+
+        keysize = read_prompt("Enter key size: ");
+
+    return keysize;
 
 def parse_dname(dname: str) -> dict[str, str]:
-    parts = [part.strip() for part in dname.split(",") if part.strip()]
-    values: dict[str, str] = {}
+    parts = [part.strip() for part in dname.split(",") if part.strip()];
+
+    values: dict[str, str] = {};
+
     for part in parts:
         key, separator, value = part.partition("=")
         field = key.strip().upper()
@@ -129,7 +126,6 @@ def read_store_password(path: Path, storepass: str | None) -> str:
         if storepass is None and read_password("Re-enter new password: ") != password:
             raise ValueError("Las contrasenas no coinciden.")
     return password
-
 
 def open_keystore_with_password(
     path: Path, storepass: str | None

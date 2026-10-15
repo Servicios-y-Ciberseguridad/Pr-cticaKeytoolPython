@@ -48,7 +48,6 @@ def derive_store_key(password: str, salt: bytes) -> bytes:
         password.encode("utf-8")
     )
 
-
 def load_keystore(path: Path, password: str) -> dict[str, KeyEntry]:
     """Load and validate a version-1 AES-GCM encrypted keystore."""
     ensure_crypto_available()

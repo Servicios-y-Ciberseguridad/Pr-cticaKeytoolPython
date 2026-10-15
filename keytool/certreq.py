@@ -161,8 +161,6 @@ def handle_certreq(
 ) -> int:
     """Carga un alias, firma su CSR y lo guarda como PEM."""
     try:
-        ensure_crypto_available()
-
         # 1. Autenticar el almacen y localizar la entrada.
         store_password, entries = open_existing_keystore(path, storepass)
         resolved_alias = resolve_alias(alias)

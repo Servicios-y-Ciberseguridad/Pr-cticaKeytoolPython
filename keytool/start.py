@@ -8,21 +8,15 @@ from pathlib import Path
 
 # Fachada del programa: conserva accesibles las funciones del prototipo TXT,
 # pero cada responsabilidad se implementa en su modulo correspondiente.
-from .changealias import handle_changealias
-from .certreq import handle_certreq
-from .exportcert import handle_exportcert
-from .listing import handle_list
-from .storepasswd import handle_storepasswd
-from .gencert import DEFAULT_VALIDITY_DAYS, handle_gencert
-from .genkeypair import (
-    SUPPORTED_KEY_SIZES,
-    handle_genkeypair,
-)
+from .changealias import handle_changealias;
+from .certreq import handle_certreq;
+from .exportcert import handle_exportcert;
+from .listing import handle_list;
+from .storepasswd import handle_storepasswd;
+from .gencert import DEFAULT_VALIDITY_DAYS, handle_gencert;
+from .genkeypair import (SUPPORTED_KEY_SIZES, handle_genkeypair);
 
-from .keystore import (
-    CRYPTO_IMPORT_ERROR,
-    DEFAULT_KEYSTORE,
-)
+from .keystore import (CRYPTO_IMPORT_ERROR, DEFAULT_KEYSTORE);
 
 def is_crypto_library_available() -> bool:
     """Indica si la dependencia cryptography esta disponible."""
@@ -62,7 +56,6 @@ def print_certreq_help() -> None:
     print("  -keypass KEYPASS", file=sys.stderr)
     print("  -file FILE        archivo .csr o .pem (por defecto: <alias>.csr)", file=sys.stderr)
 
-
 def print_exportcert_help() -> None:
     print(
         "usage: mykeytool.py -exportcert [-keystore KEYSTORE] [-storepass STOREPASS] "
@@ -74,7 +67,6 @@ def print_exportcert_help() -> None:
     print("  -alias ALIAS        alias del certificado (se solicita si se omite)", file=sys.stderr)
     print("  -file FILE          salida (por defecto: <alias>.cer)", file=sys.stderr)
     print("  -rfc                salida PEM/Base64; por defecto DER binario", file=sys.stderr)
-
 
 def print_changealias_help() -> None:
     print(
@@ -89,7 +81,6 @@ def print_changealias_help() -> None:
     print("  -alias ALIAS        alias actual", file=sys.stderr)
     print("  -destalias DESTALIAS alias nuevo", file=sys.stderr)
 
-
 def print_list_help() -> None:
     print(
         "usage: mykeytool.py -list [-keystore KEYSTORE] [-storepass STOREPASS] "
@@ -102,7 +93,6 @@ def print_list_help() -> None:
     print("  -storepass STOREPASS  se solicita sin eco si se omite", file=sys.stderr)
     print("  -alias ALIAS          limita la consulta a una entrada", file=sys.stderr)
     print("  -v, --verbose         muestra detalles publicos", file=sys.stderr)
-
 
 def print_main_help() -> None:
     print("usage: mykeytool.py [command]", file=sys.stdout)
@@ -133,7 +123,6 @@ def print_storepasswd_help() -> None:
     print("  -storepass STOREPASS  contrasena actual; se solicita sin eco si se omite", file=sys.stderr)
     print("  -new NEW_PASSWORD     al menos 8 caracteres; se solicita dos veces sin eco si se omite", file=sys.stderr)
 
-
 def print_gencert_help() -> None:
     print(
         "usage: mykeytool.py -gencert -infile REQUEST -outfile CERTIFICATE "
@@ -152,7 +141,6 @@ def print_gencert_help() -> None:
         f"  -validity DAYS        dias positivos; por defecto {DEFAULT_VALIDITY_DAYS}",
         file=sys.stderr,
     )
-
 
 def build_parser() -> argparse.ArgumentParser:
     """Construye y devuelve el analizador de argumentos de la aplicacion."""
@@ -201,7 +189,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="list",
         dest="command",
         help="lista las entradas del KeyStore tras autenticarlo",
-    )
+    );
 
     commands.add_argument(
         "-exportcert",
@@ -210,7 +198,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="exportcert",
         dest="command",
         help="exporta el certificado X.509 publico de un alias",
-    )
+    );
 
     commands.add_argument(
         "-storepasswd",
@@ -219,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="storepasswd",
         dest="command",
         help="cambia la contrasena que protege el KeyStore",
-    )
+    );
 
     commands.add_argument(
         "-gencert", "--gencert",
@@ -227,7 +215,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="gencert",
         dest="command",
         help="genera un certificado X.509 a partir de un CSR",
-    )
+    );
 
     parser.add_argument(
         "-keystore",
@@ -235,27 +223,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_KEYSTORE,
         help="archivo del almacen propio cifrado (por defecto: keystore.myks)",
-    )
-    parser.add_argument("-alias", help="alias de la entrada")
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="detalles publicos para -list"
-    )
-    parser.add_argument("-destalias", help="alias nuevo para -changealias")
-    parser.add_argument(
-        "-dname", help="DN en formato CN=..., OU=..., O=..., L=..., ST=..., C=..."
-    )
-    parser.add_argument("-storepass", help="contrasena del KeyStore")
-    parser.add_argument("-new", dest="new_password", help="contrasena nueva del KeyStore")
-    parser.add_argument("-keypass", help="contrasena de la clave del alias")
-    parser.add_argument("-keyalg", help="algoritmo de la clave (solo RSA)")
-    parser.add_argument("-keysize", type=int, help="tamano de clave en bits")
-    parser.add_argument("-infile", type=Path, help="CSR PEM o DER para -gencert")
-    parser.add_argument("-outfile", type=Path, help="certificado de salida para -gencert")
-    parser.add_argument("-rfc", action="store_true", help="exporta el certificado en PEM")
+    );
+    parser.add_argument("-alias", help="alias de la entrada");
+    parser.add_argument("-v", "--verbose", action="store_true", help="detalles publicos para -list");
+    parser.add_argument("-destalias", help="alias nuevo para -changealias");
+    parser.add_argument("-dname", help="DN en formato CN=..., OU=..., O=..., L=..., ST=..., C=...");
+    parser.add_argument("-storepass", help="contrasena del KeyStore");
+    parser.add_argument("-new", dest="new_password", help="contrasena nueva del KeyStore");
+    parser.add_argument("-keypass", help="contrasena de la clave del alias");
+    parser.add_argument("-keyalg", help="algoritmo de la clave (solo RSA)");
+    parser.add_argument("-keysize", type=int, help="tamano de clave en bits");
+    parser.add_argument("-infile", type=Path, help="CSR PEM o DER para -gencert");
+    parser.add_argument("-outfile", type=Path, help="certificado de salida para -gencert");
+    parser.add_argument("-rfc", action="store_true", help="exporta el certificado en PEM");
     parser.add_argument(
         "-validity", type=int, default=DEFAULT_VALIDITY_DAYS,
         metavar="DAYS", help="dias de validez para -gencert (por defecto: 90)",
-    )
+    );
     parser.add_argument(
         "-file",
         "--file",
@@ -270,30 +254,45 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not is_crypto_library_available():
         return -1;
 
-    arg_list = list(argv if argv is not None else sys.argv[1:])
+    arg_list = list(argv if argv is not None else sys.argv[1:]);
+
     if any(flag in arg_list for flag in ("-h", "--help")):
         if any(flag in arg_list for flag in ("-genkeypair", "--genkeypair")):
-            print_genkeypair_help()
-            return 0
+            print_genkeypair_help();
+
+            return 0;
+    
         if any(flag in arg_list for flag in ("-certreq", "--certreq")):
-            print_certreq_help()
-            return 0
+            print_certreq_help();
+
+            return 0;
+    
         if any(flag in arg_list for flag in ("-exportcert", "--exportcert")):
-            print_exportcert_help()
-            return 0
+            print_exportcert_help();
+
+            return 0;
+    
         if any(flag in arg_list for flag in ("-gencert", "--gencert")):
-            print_gencert_help()
-            return 0
+            print_gencert_help();
+
+            return 0;
+    
         if any(flag in arg_list for flag in ("-changealias", "--changealias")):
-            print_changealias_help()
-            return 0
+            print_changealias_help();
+
+            return 0;
+    
         if any(flag in arg_list for flag in ("-list", "--list")):
-            print_list_help()
-            return 0
+            print_list_help();
+
+            return 0;
+    
         if any(flag in arg_list for flag in ("-storepasswd", "--storepasswd")):
-            print_storepasswd_help()
-            return 0
-    args = build_parser().parse_args(arg_list)
+            print_storepasswd_help();
+
+            return 0;
+
+    args = build_parser().parse_args(arg_list);
 
     if args.command is None:
         print_main_help();
@@ -326,7 +325,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             storepass=args.storepass,
             output=args.file,
             rfc=args.rfc,
-        )
+        );
 
     if args.command == "gencert":
         return handle_gencert(
@@ -338,14 +337,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             outfile=args.outfile,
             rfc=args.rfc,
             validity=args.validity,
-        )
+        );
 
     if args.command == "storepasswd":
         return handle_storepasswd(
             args.keystore,
             storepass=args.storepass,
             new_password=args.new_password,
-        )
+        );
 
     if args.command == "list":
         return handle_list(
@@ -353,7 +352,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             alias=args.alias,
             storepass=args.storepass,
             verbose=args.verbose,
-        )
+        );
 
     return handle_changealias(
         args.keystore,

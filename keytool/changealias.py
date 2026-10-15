@@ -1,39 +1,31 @@
 """Cambio de alias de una entrada existente del KeyStore."""
+from __future__ import annotations;
 
-from __future__ import annotations
+import getpass;
+import sys;
+from pathlib import Path;
 
-import getpass
-import sys
-from pathlib import Path
-
-from .errors import KeytoolError
-from .genkeypair import read_store_password
+from .errors import KeytoolError;
+from .genkeypair import read_store_password;
 from .keystore import (
     DEFAULT_KEYSTORE,
     change_keystore_alias,
-    ensure_crypto_available,
-)
-
+);
 
 def resolve_alias_argument(alias: str | None, prompt: str, label: str) -> str:
-    value = alias if alias is not None else input(prompt)
-    resolved = value.strip()
+    value = alias if alias is not None else input(prompt);
+    resolved = value.strip();
+
     if not resolved:
-        raise ValueError(f"El {label} no puede estar vacio.")
-    return resolved
+        raise ValueError(f"El {label} no puede estar vacio.");
 
+    return resolved;
 
-def handle_changealias(
-    path: Path = DEFAULT_KEYSTORE,
-    *,
-    alias: str | None = None,
-    destalias: str | None = None,
-    storepass: str | None = None,
-) -> int:
+def handle_changealias(path: Path = DEFAULT_KEYSTORE, *, alias: str | None = None, destalias: str | None = None, storepass: str | None = None,) -> int:
     """Renombra una entrada existente y guarda el KeyStore de forma atómica."""
     try:
-        ensure_crypto_available()
-        password = read_store_password(path, storepass)
+        password = read_store_password(path, storepass);
+        
         source_alias = resolve_alias_argument(
             alias, "Enter existing key alias: ", "alias actual"
         )

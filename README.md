@@ -568,11 +568,12 @@ completa se ejecutó además con el comando indicado al final de la tabla.
 | Área | Casos cubiertos | Resultado esperado | Resultado obtenido |
 |---|---|---|---|
 | CLI, `genkeypair` y `certreq` | Ayuda general y específica; generación RSA y CSR en una ejecución temporal | Ayuda con las opciones reales; almacén creado y CSR PEM exportado | Correcto: se ejecutaron las ayudas y la generación produjo almacén y CSR |
+| Integración (`test_mykeytool.py`) | Generación RSA, certificados autofirmados, persistencia cifrada, CSR, ayuda, alias duplicado y contraseñas incorrectas | Operaciones correctas y errores controlados sin modificar el almacén ante fallos | Correcto: 50 pruebas, 50 aprobadas tras resolver los conflictos de merge |
 | `storepasswd` | Contraseña válida/incorrecta, confirmación, conservación de claves y fallos de escritura | Cambio autenticado; conservar el almacén original ante errores | Correcto: 19 pruebas, 19 aprobadas |
 | `list` | Orden, filtro, metadatos públicos, alias ausente y autenticación | Listado estable sin exponer claves; errores controlados | Correcto: 18 pruebas, 18 aprobadas |
 | `gencert` | CSR PEM/DER, firma, vigencia, extensiones, entradas incorrectas y escritura atómica | Certificado verificable; no escribir salida parcial ante errores | Correcto: 20 pruebas, 20 aprobadas |
 | `exportcert` | DER/PEM, alias, contraseñas, salida atómica y protección del almacén | Exportar solo el certificado; preservar el almacén y la salida previa ante errores | Correcto: 7 pruebas, 7 aprobadas |
-| Suite completa | Descubrimiento de todos los módulos de prueba | Todas las pruebas importan y pasan | **Pendiente de corregir:** 64 pruebas aprobadas y error al importar `tests/test_mykeytool.py`; el archivo contiene marcadores de conflicto Git (`<<<<<<< HEAD`) y da `SyntaxError` en la línea 1 |
+| Suite completa | Descubrimiento de todos los módulos de prueba | Todas las pruebas importan y pasan | Correcto: 114 pruebas, 114 aprobadas, sin errores de importación |
 
 La suite completa se ejecuta con:
 
@@ -580,10 +581,10 @@ La suite completa se ejecuta con:
 python -m unittest discover -s tests -v
 ```
 
-Hasta resolver los marcadores de conflicto indicados, se pueden repetir por
-separado los cuatro módulos funcionales que pasan:
+También se pueden repetir los módulos por separado:
 
 ```bash
+python -m unittest discover -s tests -p test_mykeytool.py -v
 python -m unittest discover -s tests -p test_storepasswd.py -v
 python -m unittest discover -s tests -p test_listing.py -v
 python -m unittest discover -s tests -p test_gencert.py -v

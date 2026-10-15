@@ -11,6 +11,7 @@ Crear un programa Python que permita:
 - Generar pares de claves pública/privada.
 - Almacenar claves con alias identificativos.
 - Generar solicitudes de firma de certificado (CSR) en formato PEM.
+- Firmar certificados X.509 desde solicitudes PKCS#10 en PEM o DER.
 - Consultar desde Python la información de una entrada del KeyStore.
 - Simular funcionalidades básicas de `keytool` en un entorno de consola.
 
@@ -74,6 +75,7 @@ Pr-cticaKeytoolPython/
 │   ├── genkeypair.py     # Generacion RSA y flujo interactivo
 │   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
 │   ├── certreq.py        # Comando de solicitudes CSR
+│   ├── gencert.py        # Emision X.509 a partir de un CSR
 │   ├── changealias.py    # Cambio de alias de una entrada
 │   ├── storepasswd.py    # Cambio de contrasena del almacen
 │   ├── listing.py        # Listado autenticado de datos publicos
@@ -100,6 +102,7 @@ permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 6. `keytool/errors.py` define los errores de dominio compartidos.
 7. `keytool/listing.py` lista alias y detalles públicos sin descifrar claves privadas.
 8. `keytool/storepasswd.py` autentica y cambia la contraseña del almacén.
+9. `keytool/gencert.py` valida el CSR y exporta un certificado firmado.
 
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
@@ -171,6 +174,82 @@ modifican automáticamente. Para probarlo, genera un alias nuevo y consúltalo:
 python -m keytool -genkeypair -alias nuevaClave -keyalg RSA -keysize 2048
 python -m keytool -list -alias nuevaClave
 python -m keytool -list -alias nuevaClave -v
+```
+
+### Emitir un certificado desde un CSR
+
+```powershell
+python -m keytool -certreq -alias solicitante -file solicitud.csr
+python -m keytool -gencert -keystore keystore.myks -alias emisor -infile solicitud.csr -outfile certificado.der
+python -m keytool --gencert -alias emisor -infile solicitud.csr -outfile certificado.pem -rfc -validity 365
+python -m keytool -gencert --help
+```
+
+Los alias `solicitante` y `emisor` deben existir en sus respectivos almacenes.
+El CSR también puede proceder de otra herramienta. Se admiten PKCS#10 en DER,
+PEM estándar (`BEGIN CERTIFICATE REQUEST`) y PEM de keytool
+(`BEGIN NEW CERTIFICATE REQUEST`). Se verifica la firma de la solicitud antes
+de usarla; un CSR alterado o inválido no produce ningún certificado.
+
+Argumentos de `-gencert` / `--gencert`:
+
+| Argumento | Comportamiento |
+|---|---|
+| `-keystore KEYSTORE` | Almacén del firmante; por defecto `keystore.myks` |
+| `-storepass STOREPASS` | Contraseña del almacén; si se omite, se solicita sin eco, con un único intento |
+| `-alias ALIAS` | Alias firmante; si se omite, se solicita como en `-certreq` (Enter selecciona `mykey`) |
+| `-keypass KEYPASS` | Contraseña de su clave privada; si se omite, se solicita sin eco y Enter reutiliza `storepass` |
+| `-infile REQUEST` | CSR de entrada obligatorio |
+| `-outfile CERTIFICATE` | Archivo de salida obligatorio, sin restricción de extensión |
+| `-rfc` | Exporta PEM/Base64; si se omite, exporta DER binario |
+| `-validity DAYS` | Entero positivo; por defecto **90 días** |
+
+Es preferible omitir las contraseñas en la línea de comandos para evitar
+exponerlas en el historial o a otros procesos.
+
+El certificado conserva exactamente el sujeto y la clave pública del CSR. El
+emisor es el **sujeto del certificado del alias firmante**; para entradas antiguas
+sin certificado se usa su DN. Se comprueba que la clave privada, la pública
+almacenada y la del certificado emisor correspondan al mismo par. El firmante
+debe ser RSA y firma con SHA-256. Se asigna un número de serie aleatorio positivo
+de hasta 159 bits. La validez comienza en la hora UTC de ejecución (sin
+microsegundos) y termina exactamente `DAYS` días después; se rechazan fechas
+fuera del intervalo admitido.
+
+Las extensiones emitidas son:
+
+- `BasicConstraints` crítica: `CA=false`, sin longitud de ruta.
+- `KeyUsage` crítica: firma digital; también cifrado de clave para sujetos RSA.
+  No permite firmar certificados ni CRL.
+- `SubjectKeyIdentifier` y `AuthorityKeyIdentifier`, no críticas, derivados de
+  las claves públicas del sujeto y del emisor.
+
+No se copian automáticamente extensiones del CSR, ni siquiera SAN, usos de
+clave o solicitudes de `CA=true`. Este perfil básico no sirve por sí solo para
+emitir certificados TLS con nombres DNS ni certificados de autoridad.
+
+Por compatibilidad con el flujo académico, se permite firmar con un alias sin
+certificado CA o sin permiso `keyCertSign`, pero se muestra una advertencia.
+**Una firma matemáticamente válida no equivale a una cadena de confianza
+válida.** Los certificados autofirmados creados por `-genkeypair` son `CA=false`
+y producirán esta advertencia. El comando no valida la cadena del emisor, su
+confianza ni su periodo de validez; tampoco limita la validez emitida a la del
+emisor. Para verificar una cadena real se necesita un emisor CA válido y
+confiable, con permisos y fechas apropiados.
+
+La salida se escribe de forma atómica y no puede sobrescribir el KeyStore ni el
+CSR de entrada. Un fallo previo al reemplazo conserva cualquier archivo de
+salida anterior. No se exportan claves privadas ni se modifica ninguna entrada
+del almacén. El resultado es un archivo X.509 estándar reutilizable para una
+futura importación o exportación: **esta operación no implementa `-exportcert`
+ni almacena automáticamente el certificado generado**.
+
+Con un emisor CA apropiado, se puede inspeccionar y verificar usando OpenSSL:
+
+```powershell
+openssl x509 -inform DER -in certificado.der -noout -subject -issuer -dates
+openssl x509 -inform DER -in certificado.der -out certificado.pem
+openssl verify -CAfile emisor-ca.pem certificado.pem
 ```
 
 ### Cambiar la contraseña del KeyStore
@@ -385,6 +464,7 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 | CLI | Ayuda general y ayuda específica de ambos comandos | Opciones y sintaxis visibles |
 | `list` | Almacén vacío, varios alias, orden estable, filtro, detalles públicos y errores | Listado autenticado, solo lectura y sin secretos |
 | `storepasswd` | Cambio correcto, reglas de longitud y confirmación, intento único, claves intactas y fallos de escritura/reemplazo | Contraseña nueva válida, anterior rechazada y archivo original conservado ante errores |
+| `gencert` | Firma SHA-256, sujeto, emisor, validez, CSR PEM/DER, extensiones, errores y escritura atómica | X.509 verificable con cryptography y OpenSSL, sin claves privadas ni cambios en el almacén |
 
 La suite completa se ejecuta con:
 

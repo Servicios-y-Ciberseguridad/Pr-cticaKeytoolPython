@@ -14,6 +14,7 @@ from .changealias import handle_changealias
 from .certreq import handle_certreq
 from .listing import handle_list
 from .storepasswd import handle_storepasswd
+from .gencert import DEFAULT_VALIDITY_DAYS, handle_gencert
 from .genkeypair import (
     MAX_ALIAS_ATTEMPTS,
     MAX_PASSWORD_ATTEMPTS,
@@ -123,6 +124,7 @@ def print_main_help() -> None:
     print("Comandos disponibles:", file=sys.stdout)
     print("  -genkeypair, --genkeypair    genera un par de claves", file=sys.stdout)
     print("  -certreq, --certreq          genera una solicitud CSR", file=sys.stdout)
+    print("  -gencert, --gencert          firma un certificado desde un CSR", file=sys.stdout)
     print("  -changealias, --changealias  cambia el alias de una entrada", file=sys.stdout)
     print("  -list, --list                lista las entradas del KeyStore", file=sys.stdout)
     print("  -storepasswd, --storepasswd  cambia la contrasena del KeyStore", file=sys.stdout)
@@ -143,6 +145,26 @@ def print_storepasswd_help() -> None:
     print("  -keystore KEYSTORE", file=sys.stderr)
     print("  -storepass STOREPASS  contrasena actual; se solicita sin eco si se omite", file=sys.stderr)
     print("  -new NEW_PASSWORD     al menos 8 caracteres; se solicita dos veces sin eco si se omite", file=sys.stderr)
+
+
+def print_gencert_help() -> None:
+    print(
+        "usage: mykeytool.py -gencert -infile REQUEST -outfile CERTIFICATE "
+        "[-keystore KEYSTORE] [-alias ALIAS] [-storepass STOREPASS] "
+        "[-keypass KEYPASS] [-rfc] [-validity DAYS]",
+        file=sys.stderr,
+    )
+    print("  -infile REQUEST       CSR PKCS#10 en PEM o DER (obligatorio)", file=sys.stderr)
+    print("  -outfile CERTIFICATE  archivo de salida (obligatorio)", file=sys.stderr)
+    print("  -keystore KEYSTORE    almacen del emisor", file=sys.stderr)
+    print("  -alias ALIAS          alias firmante (se solicita si se omite)", file=sys.stderr)
+    print("  -storepass STOREPASS  se solicita sin eco si se omite", file=sys.stderr)
+    print("  -keypass KEYPASS      se solicita sin eco si se omite", file=sys.stderr)
+    print("  -rfc                  salida PEM; por defecto DER", file=sys.stderr)
+    print(
+        f"  -validity DAYS        dias positivos; por defecto {DEFAULT_VALIDITY_DAYS}",
+        file=sys.stderr,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -203,6 +225,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="cambia la contrasena que protege el KeyStore",
     )
 
+    commands.add_argument(
+        "-gencert", "--gencert",
+        action="store_const",
+        const="gencert",
+        dest="command",
+        help="genera un certificado X.509 a partir de un CSR",
+    )
+
     parser.add_argument(
         "-keystore",
         "--keystore",
@@ -223,6 +253,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-keypass", help="contrasena de la clave del alias")
     parser.add_argument("-keyalg", help="algoritmo de la clave (solo RSA)")
     parser.add_argument("-keysize", type=int, help="tamano de clave en bits")
+    parser.add_argument("-infile", type=Path, help="CSR PEM o DER para -gencert")
+    parser.add_argument("-outfile", type=Path, help="certificado de salida para -gencert")
+    parser.add_argument("-rfc", action="store_true", help="exporta el certificado en PEM")
+    parser.add_argument(
+        "-validity", type=int, default=DEFAULT_VALIDITY_DAYS,
+        metavar="DAYS", help="dias de validez para -gencert (por defecto: 90)",
+    )
     parser.add_argument(
         "-file",
         "--file",
@@ -244,6 +281,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if any(flag in arg_list for flag in ("-certreq", "--certreq")):
             print_certreq_help()
+            return 0
+        if any(flag in arg_list for flag in ("-gencert", "--gencert")):
+            print_gencert_help()
             return 0
         if any(flag in arg_list for flag in ("-changealias", "--changealias")):
             print_changealias_help()
@@ -279,6 +319,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             keypass=args.keypass,
             output=args.file,
         );
+
+    if args.command == "gencert":
+        return handle_gencert(
+            args.keystore,
+            alias=args.alias,
+            storepass=args.storepass,
+            keypass=args.keypass,
+            infile=args.infile,
+            outfile=args.outfile,
+            rfc=args.rfc,
+            validity=args.validity,
+        )
 
     if args.command == "storepasswd":
         return handle_storepasswd(

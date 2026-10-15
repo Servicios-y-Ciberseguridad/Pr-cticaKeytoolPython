@@ -13,6 +13,7 @@ from pathlib import Path
 from .changealias import handle_changealias
 from .certreq import handle_certreq
 from .listing import handle_list
+from .storepasswd import handle_storepasswd
 from .genkeypair import (
     MAX_ALIAS_ATTEMPTS,
     MAX_PASSWORD_ATTEMPTS,
@@ -124,11 +125,25 @@ def print_main_help() -> None:
     print("  -certreq, --certreq          genera una solicitud CSR", file=sys.stdout)
     print("  -changealias, --changealias  cambia el alias de una entrada", file=sys.stdout)
     print("  -list, --list                lista las entradas del KeyStore", file=sys.stdout)
+    print("  -storepasswd, --storepasswd  cambia la contrasena del KeyStore", file=sys.stdout)
     print("", file=sys.stdout)
     print(
         "Usa 'mykeytool.py <comando> -h' para ver sus argumentos.",
         file=sys.stdout,
     )
+
+def print_storepasswd_help() -> None:
+    print(
+        "usage: mykeytool.py -storepasswd [-keystore KEYSTORE] "
+        "[-storepass STOREPASS] [-new NEW_PASSWORD]",
+        file=sys.stderr,
+    )
+    print("", file=sys.stderr)
+    print("Optional for -storepasswd / --storepasswd:", file=sys.stderr)
+    print("  -keystore KEYSTORE", file=sys.stderr)
+    print("  -storepass STOREPASS  contrasena actual; se solicita sin eco si se omite", file=sys.stderr)
+    print("  -new NEW_PASSWORD     al menos 8 caracteres; se solicita dos veces sin eco si se omite", file=sys.stderr)
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Construye y devuelve el analizador de argumentos de la aplicacion."""
@@ -179,6 +194,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="lista las entradas del KeyStore tras autenticarlo",
     )
 
+    commands.add_argument(
+        "-storepasswd",
+        "--storepasswd",
+        action="store_const",
+        const="storepasswd",
+        dest="command",
+        help="cambia la contrasena que protege el KeyStore",
+    )
+
     parser.add_argument(
         "-keystore",
         "--keystore",
@@ -195,6 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-dname", help="DN en formato CN=..., OU=..., O=..., L=..., ST=..., C=..."
     )
     parser.add_argument("-storepass", help="contrasena del KeyStore")
+    parser.add_argument("-new", dest="new_password", help="contrasena nueva del KeyStore")
     parser.add_argument("-keypass", help="contrasena de la clave del alias")
     parser.add_argument("-keyalg", help="algoritmo de la clave (solo RSA)")
     parser.add_argument("-keysize", type=int, help="tamano de clave en bits")
@@ -226,6 +251,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if any(flag in arg_list for flag in ("-list", "--list")):
             print_list_help()
             return 0
+        if any(flag in arg_list for flag in ("-storepasswd", "--storepasswd")):
+            print_storepasswd_help()
+            return 0
     args = build_parser().parse_args(arg_list)
 
     if args.command is None:
@@ -251,6 +279,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             keypass=args.keypass,
             output=args.file,
         );
+
+    if args.command == "storepasswd":
+        return handle_storepasswd(
+            args.keystore,
+            storepass=args.storepass,
+            new_password=args.new_password,
+        )
 
     if args.command == "list":
         return handle_list(

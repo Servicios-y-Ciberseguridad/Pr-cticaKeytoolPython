@@ -188,18 +188,31 @@ def resolve_dname(dname: str | None) -> dict[str, str]:
 def is_same_password(pwrd: str, npwrd: str):
     return pwrd == npwrd;
 
-def read_store_password(path: Path, spwrd: str | None) -> str:
-    password = spwrd if spwrd is not None else read_password("Enter keystore password: ");
+def read_new_store_password(
+    supplied: str | None,
+    prompt: str = "Enter new keystore password: ",
+    *,
+    current_password: str | None = None,
+) -> str:
+    password = supplied if supplied is not None else read_password(prompt)
+    if not password:
+        raise ValueError("La contrasena no puede estar vacia.")
+    if len(password) < 8:
+        raise ValueError("La contrasena debe tener al menos 8 caracteres.")
+    if password == current_password:
+        raise ValueError("La contrasena nueva debe ser distinta de la actual.")
+    if supplied is None and read_password("Re-enter new password: ") != password:
+        raise ValueError("Las contrasenas no coinciden.")
+    return password
 
+
+def read_store_password(path: Path, spwrd: str | None) -> str:
+    if not path.exists():
+        return read_new_store_password(spwrd, "Enter keystore password: ")
+
+    password = spwrd if spwrd is not None else read_password("Enter keystore password: ");
     if not password:
         raise ValueError("La contrasena no puede estar vacia.");
-
-    if not path.exists():
-        if len(password) < 8:
-            raise ValueError("La contrasena debe tener al menos 8 caracteres.");
-    
-        if spwrd is None and read_password("Re-enter new password: ") != password:
-            raise ValueError("Las contrasenas no coinciden.");
 
     return password;
 

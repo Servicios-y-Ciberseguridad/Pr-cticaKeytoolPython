@@ -75,6 +75,7 @@ Pr-cticaKeytoolPython/
 │   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
 │   ├── certreq.py        # Comando de solicitudes CSR
 │   ├── changealias.py    # Cambio de alias de una entrada
+│   ├── storepasswd.py    # Cambio de contrasena del almacen
 │   ├── listing.py        # Listado autenticado de datos publicos
 │   └── errors.py         # Errores de dominio
 ├── tests/
@@ -98,6 +99,7 @@ permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 5. `keytool/keystore.py` cifra, valida, lee y escribe el almacén.
 6. `keytool/errors.py` define los errores de dominio compartidos.
 7. `keytool/listing.py` lista alias y detalles públicos sin descifrar claves privadas.
+8. `keytool/storepasswd.py` autentica y cambia la contraseña del almacén.
 
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
@@ -170,6 +172,42 @@ python -m keytool -genkeypair -alias nuevaClave -keyalg RSA -keysize 2048
 python -m keytool -list -alias nuevaClave
 python -m keytool -list -alias nuevaClave -v
 ```
+
+### Cambiar la contraseña del KeyStore
+
+```bash
+python mykeytool.py -storepasswd -keystore keystore.myks
+python -m keytool --storepasswd -keystore keystore.myks
+python mykeytool.py -storepasswd --help
+```
+
+`-storepasswd` / `--storepasswd` acepta `-keystore KEYSTORE`,
+`-storepass STOREPASS` (contraseña actual) y `-new NEW_PASSWORD` (contraseña
+nueva). Si se omite `-keystore`, se usa `keystore.myks`. Es preferible omitir las
+contraseñas en la línea de comandos para evitar que queden en el historial o
+sean visibles para otros procesos: la actual se solicita sin eco y la nueva,
+dos veces sin eco para confirmarla. Con `-new`, no se solicita confirmación,
+igual que al crear un almacén con `-storepass`.
+
+Solo se permite un intento de autenticación por ejecución. La contraseña
+actual se verifica antes de pedir la nueva, que debe tener al menos 8
+caracteres, como al crear el almacén, y ser distinta de la contraseña actual.
+Si se reutiliza la actual, se muestra un error inmediatamente después de
+introducirla, sin pedir confirmación, y el archivo no se modifica.
+El comando vuelve a cifrar y autenticar
+todas las entradas con sal y nonce aleatorios nuevos y una nueva clave
+derivada mediante Scrypt; no cambia el formato del archivo.
+
+Las entradas, certificados y claves privadas cifradas se conservan intactos:
+no se solicita ni se cambia ninguna contraseña individual de clave.
+**Si una clave usaba la contraseña anterior del almacén, seguirá usando esa
+contraseña anterior**, no la nueva.
+
+El archivo se reemplaza de forma atómica solo después de escribir y
+sincronizar el contenido completo. Una contraseña actual incorrecta, una
+confirmación distinta, una cancelación o un fallo de escritura previo al
+reemplazo conserva el archivo original. Un almacén inexistente no se crea.
+Los errores se comunican sin mostrar contraseñas ni trazas.
 
 ### Consultar las entradas
 
@@ -346,6 +384,7 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 | Errores de CSR | Alias inexistente, contraseña de almacén/clave incorrecta y almacén dañado | Código de salida 1, sin traceback ni archivo parcial |
 | CLI | Ayuda general y ayuda específica de ambos comandos | Opciones y sintaxis visibles |
 | `list` | Almacén vacío, varios alias, orden estable, filtro, detalles públicos y errores | Listado autenticado, solo lectura y sin secretos |
+| `storepasswd` | Cambio correcto, reglas de longitud y confirmación, intento único, claves intactas y fallos de escritura/reemplazo | Contraseña nueva válida, anterior rechazada y archivo original conservado ante errores |
 
 La suite completa se ejecuta con:
 

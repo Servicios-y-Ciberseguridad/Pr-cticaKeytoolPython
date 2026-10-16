@@ -19,12 +19,16 @@ try:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
+<<<<<<< HEAD
     from cryptography.x509.oid import NameOID
+=======
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 except ModuleNotFoundError:
     x509 = None
     hashes = None
     serialization = None
     rsa = None
+<<<<<<< HEAD
     NameOID = None
 
 from .genkeypair import read_password, resolve_alias
@@ -34,10 +38,18 @@ from .keystore import (
     UNKNOWN_DN_VALUE,
     KeyEntry,
     ensure_crypto_available,
+=======
+
+from .genkeypair import build_subject, read_password, resolve_alias
+from .keystore import (
+    DEFAULT_KEYSTORE,
+    KeyEntry,
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
     load_keystore,
     write_bytes_atomic,
 )
 
+<<<<<<< HEAD
 
 # Los nombres se guardan como texto para que el modulo pueda cargarse incluso
 # cuando cryptography no este instalado; main intentara usar el entorno virtual.
@@ -50,6 +62,8 @@ DN_OIDS = {
     "C": "COUNTRY_NAME",
 }
 
+=======
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 KEYTOOL_PEM_HEADER = b"-----BEGIN NEW CERTIFICATE REQUEST-----"
 KEYTOOL_PEM_FOOTER = b"-----END NEW CERTIFICATE REQUEST-----"
 PEM_LINE_LENGTH = 64
@@ -109,6 +123,7 @@ def load_private_key(
     return private_key
 
 
+<<<<<<< HEAD
 def build_subject(dn: dict[str, str]):
     """Convierte los campos CN, OU, O, L, ST y C en un sujeto X.509."""
     attributes = []
@@ -121,6 +136,8 @@ def build_subject(dn: dict[str, str]):
     return x509.Name(attributes)
 
 
+=======
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 def resolve_output_path(output: Path | None, alias: str) -> Path:
     """Acepta una salida .csr/.pem o crea un nombre seguro desde el alias."""
     if output is None:
@@ -163,8 +180,11 @@ def handle_certreq(
 ) -> int:
     """Carga un alias, firma su CSR y lo guarda como PEM."""
     try:
+<<<<<<< HEAD
         ensure_crypto_available()
 
+=======
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
         # 1. Autenticar el almacen y localizar la entrada.
         store_password, entries = open_existing_keystore(path, storepass)
         resolved_alias = resolve_alias(alias)

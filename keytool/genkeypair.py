@@ -5,23 +5,28 @@ from __future__ import annotations
 import getpass
 import sys
 import warnings
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .errors import DuplicateAliasError, KeytoolError
 
 try:
-    from cryptography.hazmat.primitives import serialization
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
 except ModuleNotFoundError:
+    x509 = None
+    hashes = None
     serialization = None
     rsa = None
+    NameOID = None
 
 from .keystore import (
     DEFAULT_KEYSTORE,
     DN_FIELDS,
     UNKNOWN_DN_VALUE,
     KeyEntry,
-    ensure_crypto_available,
     load_keystore,
     save_keystore,
 )
@@ -29,13 +34,54 @@ from .keystore import (
 MAX_PASSWORD_ATTEMPTS = 1
 MAX_ALIAS_ATTEMPTS = 3
 SUPPORTED_KEY_SIZES = (2048, 3072, 4096, 7680, 15360)
+<<<<<<< HEAD
+=======
+CERTIFICATE_VALIDITY_DAYS = 90
+DN_OIDS = {
+    "CN": "COMMON_NAME",
+    "OU": "ORGANIZATIONAL_UNIT_NAME",
+    "O": "ORGANIZATION_NAME",
+    "L": "LOCALITY_NAME",
+    "ST": "STATE_OR_PROVINCE_NAME",
+    "C": "COUNTRY_NAME",
+}
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
+
+def build_subject(dn: dict[str, str]) -> x509.Name:
+    """Construye el sujeto compartido por certificados y solicitudes CSR."""
+    attributes = []
+    for field in DN_FIELDS:
+        value = dn[field]
+        if field == "C" and value == UNKNOWN_DN_VALUE:
+            continue
+        oid = getattr(NameOID, DN_OIDS[field])
+        attributes.append(x509.NameAttribute(oid, value))
+    return x509.Name(attributes)
+
+
+def build_self_signed_certificate(
+    private_key: rsa.RSAPrivateKey, dn: dict[str, str]
+) -> x509.Certificate:
+    subject = build_subject(dn)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=CERTIFICATE_VALIDITY_DAYS))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .sign(private_key, hashes.SHA256())
+    )
 
 def read_password(prompt: str) -> str:
     with warnings.catch_warnings():
-        warnings.simplefilter("error", getpass.GetPassWarning)
-        return getpass.getpass(prompt)
+        warnings.simplefilter("error", getpass.GetPassWarning);
 
+        return getpass.getpass(prompt);
 
 def read_required(prompt: str) -> str:
     value = input(prompt).strip()
@@ -51,6 +97,20 @@ def resolve_key_algorithm(keyalg: str | None) -> str:
         if algorithm != "RSA":
             raise ValueError("Solo se admite -keyalg RSA en esta implementacion.")
         return algorithm
+<<<<<<< HEAD
+
+    while True:
+        algorithm = read_required("Enter key algorithm: ").upper()
+        if algorithm == "RSA":
+            return algorithm
+        print("Error: algoritmo no valido; solo se admite RSA.", file=sys.stderr)
+
+
+def is_key_size_supported(keysize: int) -> bool:
+    """Indica si el tamano RSA pertenece a la lista admitida."""
+    return keysize in SUPPORTED_KEY_SIZES
+=======
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
     while True:
         algorithm = read_required("Enter key algorithm: ").upper()
@@ -63,13 +123,13 @@ def is_key_size_supported(keysize: int) -> bool:
     """Indica si el tamano RSA pertenece a la lista admitida."""
     return keysize in SUPPORTED_KEY_SIZES
 
-
 def resolve_key_size(keysize: int | None) -> int:
     if keysize is not None:
         if not is_key_size_supported(keysize):
             allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
             raise ValueError(f"-keysize debe ser uno de estos valores: {allowed}.")
         return keysize
+<<<<<<< HEAD
 
     while True:
         allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
@@ -84,7 +144,22 @@ def resolve_key_size(keysize: int | None) -> int:
             f"Error: tamano no valido; valores admitidos: {allowed}.",
             file=sys.stderr,
         )
+=======
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
+    while True:
+        allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
+        entered = input(f"Enter key size ({allowed}) [2048]: ").strip()
+        try:
+            resolved = 2048 if entered == "" else int(entered)
+        except ValueError:
+            resolved = 0
+        if is_key_size_supported(resolved):
+            return resolved
+        print(
+            f"Error: tamano no valido; valores admitidos: {allowed}.",
+            file=sys.stderr,
+        )
 
 def parse_dname(dname: str) -> dict[str, str]:
     parts = [part.strip() for part in dname.split(",") if part.strip()]
@@ -144,19 +219,28 @@ def resolve_dname(dname: str | None) -> dict[str, str]:
         return parsed
     return read_dname_interactively()
 
+def is_same_password(pwrd: str, npwrd: str):
+    return pwrd == npwrd;
 
-def read_store_password(path: Path, storepass: str | None) -> str:
-    password = storepass if storepass is not None else read_password("Enter keystore password: ")
+def read_new_store_password(
+    supplied: str | None,
+    prompt: str = "Enter new keystore password: ",
+    *,
+    current_password: str | None = None,
+) -> str:
+    password = supplied if supplied is not None else read_password(prompt)
     if not password:
         raise ValueError("La contrasena no puede estar vacia.")
-    if not path.exists():
-        if len(password) < 8:
-            raise ValueError("La contrasena debe tener al menos 8 caracteres.")
-        if storepass is None and read_password("Re-enter new password: ") != password:
-            raise ValueError("Las contrasenas no coinciden.")
+    if len(password) < 8:
+        raise ValueError("La contrasena debe tener al menos 8 caracteres.")
+    if password == current_password:
+        raise ValueError("La contrasena nueva debe ser distinta de la actual.")
+    if supplied is None and read_password("Re-enter new password: ") != password:
+        raise ValueError("Las contrasenas no coinciden.")
     return password
 
 
+<<<<<<< HEAD
 def open_keystore_with_password(
     path: Path, storepass: str | None
 ) -> tuple[str, dict[str, KeyEntry]]:
@@ -166,7 +250,25 @@ def open_keystore_with_password(
 
     password = read_store_password(path, storepass)
     return password, load_keystore(path, password)
+=======
+def read_store_password(path: Path, spwrd: str | None) -> str:
+    if not path.exists():
+        return read_new_store_password(spwrd, "Enter keystore password: ")
 
+    password = spwrd if spwrd is not None else read_password("Enter keystore password: ");
+    if not password:
+        raise ValueError("La contrasena no puede estar vacia.");
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
+
+    return password;
+
+def open_keystore_with_password(path: Path, storepass: str | None) -> tuple[str, dict[str, KeyEntry]]:
+    """Abre o crea el KeyStore con un unico intento por ejecucion."""
+    if not path.exists():
+        return read_store_password(path, storepass), {}
+
+    password = read_store_password(path, storepass)
+    return password, load_keystore(path, password)
 
 def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str:
     if keypass is not None:
@@ -181,7 +283,6 @@ def resolve_key_password(keypass: str | None, storepass: str, alias: str) -> str
     if read_password("Re-enter key password: ") != password:
         raise ValueError("Las contrasenas de la clave no coinciden.")
     return password
-
 
 def resolve_alias(alias: str | None) -> str:
     if alias is not None:
@@ -234,7 +335,6 @@ def handle_genkeypair(
 ) -> int:
     """Genera un par RSA y guarda la entrada en un almacen cifrado."""
     try:
-        ensure_crypto_available()
         algorithm = resolve_key_algorithm(keyalg)
         resolved_keysize = resolve_key_size(keysize)
         password, entries = open_keystore_with_password(path, storepass)
@@ -244,6 +344,7 @@ def handle_genkeypair(
         private_key = rsa.generate_private_key(
             public_exponent=65537, key_size=resolved_keysize
         )
+        certificate = build_self_signed_certificate(private_key, dn)
         entries[alias] = KeyEntry(
             private_key=private_key.private_bytes(
                 serialization.Encoding.PEM,
@@ -255,6 +356,7 @@ def handle_genkeypair(
                 serialization.PublicFormat.SubjectPublicKeyInfo,
             ).decode("ascii"),
             dn=dn,
+            certificate=certificate.public_bytes(serialization.Encoding.PEM).decode("ascii"),
         )
         save_keystore(path, password, entries)
     except getpass.GetPassWarning:

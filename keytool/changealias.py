@@ -1,4 +1,5 @@
 """Cambio de alias de una entrada existente del KeyStore."""
+<<<<<<< HEAD
 
 from __future__ import annotations
 
@@ -34,6 +35,35 @@ def handle_changealias(
     try:
         ensure_crypto_available()
         password = read_store_password(path, storepass)
+=======
+from __future__ import annotations;
+
+import getpass;
+import sys;
+from pathlib import Path;
+
+from .errors import KeytoolError;
+from .genkeypair import read_store_password;
+from .keystore import (
+    DEFAULT_KEYSTORE,
+    change_keystore_alias,
+);
+
+def resolve_alias_argument(alias: str | None, prompt: str, label: str) -> str:
+    value = alias if alias is not None else input(prompt);
+    resolved = value.strip();
+
+    if not resolved:
+        raise ValueError(f"El {label} no puede estar vacio.");
+
+    return resolved;
+
+def handle_changealias(path: Path = DEFAULT_KEYSTORE, *, alias: str | None = None, destalias: str | None = None, storepass: str | None = None,) -> int:
+    """Renombra una entrada existente y guarda el KeyStore de forma atómica."""
+    try:
+        password = read_store_password(path, storepass);
+        
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
         source_alias = resolve_alias_argument(
             alias, "Enter existing key alias: ", "alias actual"
         )
@@ -61,4 +91,8 @@ def handle_changealias(
         f"Exito: alias '{source_alias}' cambiado a '{destination_alias}' "
         f"en '{path}'."
     )
+<<<<<<< HEAD
     return 0
+=======
+    return 0
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755

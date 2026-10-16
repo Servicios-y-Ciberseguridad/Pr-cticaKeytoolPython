@@ -4,11 +4,16 @@ import io
 import tempfile
 import unittest
 import warnings
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 from cryptography import x509
+<<<<<<< HEAD
 from cryptography.hazmat.primitives import serialization
+=======
+from cryptography.hazmat.primitives import hashes, serialization
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.x509.oid import NameOID
@@ -23,6 +28,120 @@ from keytool.errors import (
     KeystoreNotFoundError,
 )
 from keytool.certreq import load_private_key, resolve_output_path
+<<<<<<< HEAD
+=======
+from keytool.genkeypair import build_subject
+
+
+class CliArgumentTests(unittest.TestCase):
+    commands = (
+        "genkeypair", "certreq", "changealias", "list",
+        "exportcert", "storepasswd", "gencert",
+    )
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.directory = Path(directory.name)
+        self.path = self.directory / "arguments.myks"
+
+    def assert_parse_error(self, arguments, expected_error):
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            patch("builtins.input") as input_mock,
+            patch("mykeytool.getpass.getpass") as password_mock,
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            mykeytool.main(["-keystore", str(self.path), *arguments])
+
+        diagnostic = f"Arguments: {arguments!r}\nstderr: {errors.getvalue()}"
+        self.assertEqual(raised.exception.code, 2, diagnostic)
+        self.assertEqual(output.getvalue(), "", diagnostic)
+        self.assertIn("usage:", errors.getvalue(), diagnostic)
+        self.assertIn(expected_error, errors.getvalue(), diagnostic)
+        self.assertNotIn("Traceback", errors.getvalue(), diagnostic)
+        input_mock.assert_not_called()
+        password_mock.assert_not_called()
+        self.assertEqual(list(self.directory.iterdir()), [], diagnostic)
+
+    def test_rejects_unknown_arguments(self):
+        for argument in ("--unknown-option", "unexpected-positional"):
+            with self.subTest(argument=argument):
+                self.assert_parse_error(
+                    ["--genkeypair", argument], "unrecognized arguments"
+                )
+
+    def test_rejects_multiple_commands(self):
+        for index, command in enumerate(self.commands):
+            for other in self.commands[index + 1:]:
+                with self.subTest(command=command, other=other):
+                    self.assert_parse_error(
+                        [f"--{command}", f"--{other}"], "not allowed with argument"
+                    )
+
+    def test_rejects_options_without_values(self):
+        for option in (
+            "-keystore", "-alias", "-destalias", "-dname", "-storepass",
+            "-new", "-keypass", "-keyalg", "-keysize", "-infile",
+            "-outfile", "-validity", "-file",
+        ):
+            with self.subTest(option=option):
+                self.assert_parse_error(
+                    ["--genkeypair", option], "expected one argument"
+                )
+
+    def test_rejects_non_integer_numeric_arguments(self):
+        for option in ("-keysize", "-validity"):
+            for value in ("abc", "2048.5"):
+                with self.subTest(option=option, value=value):
+                    self.assert_parse_error(
+                        ["--genkeypair", option, value], "invalid int value"
+                    )
+
+    def test_general_help_exits_successfully_without_prompting(self):
+        for flag in ("-h", "--help"):
+            with self.subTest(flag=flag):
+                output = io.StringIO()
+                errors = io.StringIO()
+                with (
+                    patch("builtins.input") as input_mock,
+                    patch("mykeytool.getpass.getpass") as password_mock,
+                    contextlib.redirect_stdout(output),
+                    contextlib.redirect_stderr(errors),
+                    self.assertRaises(SystemExit) as raised,
+                ):
+                    mykeytool.main([flag])
+                self.assertEqual(raised.exception.code, 0)
+                for command in self.commands:
+                    self.assertIn(f"--{command}", output.getvalue())
+                self.assertEqual(errors.getvalue(), "")
+                input_mock.assert_not_called()
+                password_mock.assert_not_called()
+                self.assertEqual(list(self.directory.iterdir()), [])
+
+    def test_command_help_supports_both_spellings_without_prompting(self):
+        for command in self.commands:
+            for prefix in ("-", "--"):
+                with self.subTest(command=command, prefix=prefix):
+                    output = io.StringIO()
+                    errors = io.StringIO()
+                    with (
+                        patch("builtins.input") as input_mock,
+                        patch("mykeytool.getpass.getpass") as password_mock,
+                        contextlib.redirect_stdout(output),
+                        contextlib.redirect_stderr(errors),
+                    ):
+                        result = mykeytool.main([f"{prefix}{command}", "--help"])
+                    self.assertEqual(result, 0, errors.getvalue())
+                    self.assertEqual(output.getvalue(), "")
+                    self.assertIn(f"usage: mykeytool.py -{command}", errors.getvalue())
+                    input_mock.assert_not_called()
+                    password_mock.assert_not_called()
+                    self.assertEqual(list(self.directory.iterdir()), [])
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 
 
 class GenKeyPairTests(unittest.TestCase):
@@ -80,11 +199,64 @@ class GenKeyPairTests(unittest.TestCase):
         self.assertEqual(entry["dn"], dict(zip(mykeytool.DN_FIELDS, [
             "Ana", "TI", "Empresa", "Madrid", "Madrid", "ES"
         ])))
+        certificate = x509.load_pem_x509_certificate(entry["certificate"].encode("ascii"))
+        self.assertEqual(certificate.subject, build_subject(entry["dn"]))
+        self.assertEqual(certificate.issuer, certificate.subject)
+        self.assertEqual(
+            certificate.public_key().public_bytes(
+                serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+            ),
+            entry["public_key"].encode("ascii"),
+        )
+        certificate.verify_directly_issued_by(certificate)
+        self.assertEqual(certificate.signature_hash_algorithm.name, "sha256")
+        self.assertGreater(certificate.serial_number, 0)
+        self.assertLessEqual(certificate.serial_number.bit_length(), 159)
+        self.assertEqual(
+            certificate.not_valid_after_utc - certificate.not_valid_before_utc,
+            timedelta(days=90),
+        )
+        now = datetime.now(timezone.utc)
+        self.assertLessEqual(certificate.not_valid_before_utc, now)
+        self.assertGreater(certificate.not_valid_before_utc, now - timedelta(minutes=1))
+        constraints = certificate.extensions.get_extension_for_class(x509.BasicConstraints)
+        self.assertTrue(constraints.critical)
+        self.assertFalse(constraints.value.ca)
         encrypted = self.path.read_bytes()
         for secret in (b"miClave", b"PRIVATE KEY", b"Empresa", self.password.encode()):
             self.assertNotIn(secret, encrypted)
         with self.assertRaisesRegex(KeystoreAuthenticationError, "incorrecta"):
             mykeytool.load_keystore(self.path, "wrong-password")
+
+    def test_generated_certificate_is_listed_without_decrypting_private_key(self):
+        self.assertEqual(self.generate()[0], 0)
+        entry = mykeytool.load_keystore(self.path, self.password)["miClave"]
+        certificate = x509.load_pem_x509_certificate(entry["certificate"].encode("ascii"))
+        fingerprint = certificate.fingerprint(hashes.SHA256()).hex(":").upper()
+        output = io.StringIO()
+        errors = io.StringIO()
+        with (
+            patch("cryptography.hazmat.primitives.serialization.load_pem_private_key",
+                  side_effect=AssertionError("Must not decrypt private keys")),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = mykeytool.main([
+                "-list", "-keystore", str(self.path),
+                "-storepass", self.password, "-alias", "miClave",
+            ])
+        self.assertEqual(result, 0, errors.getvalue())
+        self.assertIn(f"Certificate fingerprint (SHA-256): {fingerprint}", output.getvalue())
+        self.assertNotIn("PRIVATE KEY", output.getvalue())
+        self.assertNotIn(self.password, output.getvalue())
+
+    def test_self_signed_certificate_handles_unknown_country(self):
+        self.assertEqual(self.generate(dn=["", "", "", "", "", ""])[0], 0)
+        entry = mykeytool.load_keystore(self.path, self.password)["miClave"]
+        certificate = x509.load_pem_x509_certificate(entry["certificate"].encode("ascii"))
+        self.assertEqual(certificate.subject, build_subject(entry["dn"]))
+        self.assertEqual(certificate.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME), [])
+        certificate.verify_directly_issued_by(certificate)
 
     def test_loads_one_entry_by_alias_and_store_password(self):
         self.assertEqual(self.generate()[0], 0)

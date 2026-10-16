@@ -36,11 +36,28 @@ AES_GCM_TAG_SIZE = 16
 DN_FIELDS = ("CN", "OU", "O", "L", "ST", "C")
 UNKNOWN_DN_VALUE = "Unknown"
 
+<<<<<<< HEAD
 class KeyEntry(TypedDict):
+=======
+class RequiredKeyEntry(TypedDict):
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
     private_key: str
     public_key: str
     dn: dict[str, str]
 
+<<<<<<< HEAD
+=======
+
+class KeyEntry(RequiredKeyEntry, total=False):
+    certificate: str
+
+def ensure_crypto_available() -> None:
+    if CRYPTO_IMPORT_ERROR is not None:
+        raise ModuleNotFoundError(
+            "No se pudo importar 'cryptography' con este interprete de Python."
+        ) from CRYPTO_IMPORT_ERROR
+
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 def derive_store_key(password: str, salt: bytes) -> bytes:
     return Scrypt(salt=salt, length=32, n=2**17, r=8, p=1).derive(
         password.encode("utf-8")

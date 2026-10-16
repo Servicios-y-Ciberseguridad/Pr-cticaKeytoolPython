@@ -5,16 +5,22 @@ from __future__ import annotations
 import getpass
 import sys
 import warnings
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .errors import DuplicateAliasError, KeytoolError
 
 try:
-    from cryptography.hazmat.primitives import serialization
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
 except ModuleNotFoundError:
+    x509 = None
+    hashes = None
     serialization = None
     rsa = None
+    NameOID = None
 
 from .keystore import (
     DEFAULT_KEYSTORE,
@@ -28,6 +34,48 @@ from .keystore import (
 MAX_PASSWORD_ATTEMPTS = 1
 MAX_ALIAS_ATTEMPTS = 3
 SUPPORTED_KEY_SIZES = (2048, 3072, 4096, 7680, 15360)
+<<<<<<< HEAD
+=======
+CERTIFICATE_VALIDITY_DAYS = 90
+DN_OIDS = {
+    "CN": "COMMON_NAME",
+    "OU": "ORGANIZATIONAL_UNIT_NAME",
+    "O": "ORGANIZATION_NAME",
+    "L": "LOCALITY_NAME",
+    "ST": "STATE_OR_PROVINCE_NAME",
+    "C": "COUNTRY_NAME",
+}
+
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
+
+def build_subject(dn: dict[str, str]) -> x509.Name:
+    """Construye el sujeto compartido por certificados y solicitudes CSR."""
+    attributes = []
+    for field in DN_FIELDS:
+        value = dn[field]
+        if field == "C" and value == UNKNOWN_DN_VALUE:
+            continue
+        oid = getattr(NameOID, DN_OIDS[field])
+        attributes.append(x509.NameAttribute(oid, value))
+    return x509.Name(attributes)
+
+
+def build_self_signed_certificate(
+    private_key: rsa.RSAPrivateKey, dn: dict[str, str]
+) -> x509.Certificate:
+    subject = build_subject(dn)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=CERTIFICATE_VALIDITY_DAYS))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .sign(private_key, hashes.SHA256())
+    )
 
 def read_password(prompt: str) -> str:
     with warnings.catch_warnings():
@@ -62,6 +110,7 @@ def is_key_size_supported(keysize: int) -> bool:
     return keysize in SUPPORTED_KEY_SIZES
 
 def resolve_key_size(keysize: int | None) -> int:
+<<<<<<< HEAD
     while not is_key_size_supported(keysize):
         print(f"Error: tamano no valido.", file=sys.stderr);
         allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES));
@@ -69,6 +118,27 @@ def resolve_key_size(keysize: int | None) -> int:
         keysize = int(input(f"Enter key size ({allowed}): ").strip());
 
     return keysize;
+=======
+    if keysize is not None:
+        if not is_key_size_supported(keysize):
+            allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
+            raise ValueError(f"-keysize debe ser uno de estos valores: {allowed}.")
+        return keysize
+
+    while True:
+        allowed = ", ".join(map(str, SUPPORTED_KEY_SIZES))
+        entered = input(f"Enter key size ({allowed}) [2048]: ").strip()
+        try:
+            resolved = 2048 if entered == "" else int(entered)
+        except ValueError:
+            resolved = 0
+        if is_key_size_supported(resolved):
+            return resolved
+        print(
+            f"Error: tamano no valido; valores admitidos: {allowed}.",
+            file=sys.stderr,
+        )
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 
 def parse_dname(dname: str) -> dict[str, str]:
     parts = [part.strip() for part in dname.split(",") if part.strip()]
@@ -130,6 +200,7 @@ def resolve_dname(dname: str | None) -> dict[str, str]:
 
 def is_same_password(pwrd: str, npwrd: str):
     return pwrd == npwrd;
+<<<<<<< HEAD
 
 def read_store_password(path: Path, spwrd: str | None) -> str:
     password = spwrd if spwrd is not None else read_password("Enter keystore password: ");
@@ -143,9 +214,29 @@ def read_store_password(path: Path, spwrd: str | None) -> str:
     
         if spwrd is None and read_password("Re-enter new password: ") != password:
             raise ValueError("Las contrasenas no coinciden.");
+=======
+
+def read_new_store_password(
+    supplied: str | None,
+    prompt: str = "Enter new keystore password: ",
+    *,
+    current_password: str | None = None,
+) -> str:
+    password = supplied if supplied is not None else read_password(prompt)
+    if not password:
+        raise ValueError("La contrasena no puede estar vacia.")
+    if len(password) < 8:
+        raise ValueError("La contrasena debe tener al menos 8 caracteres.")
+    if password == current_password:
+        raise ValueError("La contrasena nueva debe ser distinta de la actual.")
+    if supplied is None and read_password("Re-enter new password: ") != password:
+        raise ValueError("Las contrasenas no coinciden.")
+    return password
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 
     return password;
 
+<<<<<<< HEAD
 def open_keystore_with_password(path: Path, storepass: str | None) -> tuple[str, dict[str, KeyEntry]]:
     """Abre o crea el KeyStore con un unico intento por ejecucion."""
     if not path.exists():
@@ -168,10 +259,30 @@ def resolve_key_password(pwrd: str | None, kspwrd: str, alias: str) -> str:
         raise ValueError("Contraseñas no coinciden.");
 
     password = read_password(f"Enter key password for <{alias}> (RETURN if same as keystore password): ");
+=======
+def read_store_password(path: Path, spwrd: str | None) -> str:
+    if not path.exists():
+        return read_new_store_password(spwrd, "Enter keystore password: ")
+
+    password = spwrd if spwrd is not None else read_password("Enter keystore password: ");
+    if not password:
+        raise ValueError("La contrasena no puede estar vacia.");
+
+    return password;
+
+def open_keystore_with_password(path: Path, storepass: str | None) -> tuple[str, dict[str, KeyEntry]]:
+    """Abre o crea el KeyStore con un unico intento por ejecucion."""
+    if not path.exists():
+        return read_store_password(path, storepass), {}
+
+    password = read_store_password(path, storepass)
+    return password, load_keystore(path, password)
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 
     if password == "":
         return kspwrd;
 
+<<<<<<< HEAD
     tryLeft = 3;
     
     while read_password("Re-enter key password: ") != password and tryLeft > 0:
@@ -186,6 +297,8 @@ def resolve_key_password(pwrd: str | None, kspwrd: str, alias: str) -> str:
 
     return password;
 
+=======
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 def resolve_alias(alias: str | None) -> str:
     if alias is not None:
         resolved = alias.strip()
@@ -246,6 +359,7 @@ def handle_genkeypair(
         private_key = rsa.generate_private_key(
             public_exponent=65537, key_size=resolved_keysize
         )
+        certificate = build_self_signed_certificate(private_key, dn)
         entries[alias] = KeyEntry(
             private_key=private_key.private_bytes(
                 serialization.Encoding.PEM,
@@ -257,6 +371,7 @@ def handle_genkeypair(
                 serialization.PublicFormat.SubjectPublicKeyInfo,
             ).decode("ascii"),
             dn=dn,
+            certificate=certificate.public_bytes(serialization.Encoding.PEM).decode("ascii"),
         )
         save_keystore(path, password, entries)
     except getpass.GetPassWarning:

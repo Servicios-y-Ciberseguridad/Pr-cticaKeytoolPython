@@ -19,12 +19,16 @@ try:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
+<<<<<<< HEAD
     from cryptography.x509.oid import NameOID
+=======
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 except ModuleNotFoundError:
     x509 = None
     hashes = None
     serialization = None
     rsa = None
+<<<<<<< HEAD
     NameOID = None
 
 from .genkeypair import read_password, resolve_alias
@@ -32,11 +36,18 @@ from .keystore import (
     DEFAULT_KEYSTORE,
     DN_FIELDS,
     UNKNOWN_DN_VALUE,
+=======
+
+from .genkeypair import build_subject, read_password, resolve_alias
+from .keystore import (
+    DEFAULT_KEYSTORE,
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
     KeyEntry,
     load_keystore,
     write_bytes_atomic,
 )
 
+<<<<<<< HEAD
 # Los nombres se guardan como texto para que el modulo pueda cargarse incluso
 # cuando cryptography no este instalado; main intentara usar el entorno virtual.
 DN_OIDS = {
@@ -48,6 +59,8 @@ DN_OIDS = {
     "C": "COUNTRY_NAME",
 }
 
+=======
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 KEYTOOL_PEM_HEADER = b"-----BEGIN NEW CERTIFICATE REQUEST-----"
 KEYTOOL_PEM_FOOTER = b"-----END NEW CERTIFICATE REQUEST-----"
 PEM_LINE_LENGTH = 64
@@ -107,6 +120,7 @@ def load_private_key(
     return private_key
 
 
+<<<<<<< HEAD
 def build_subject(dn: dict[str, str]):
     """Convierte los campos CN, OU, O, L, ST y C en un sujeto X.509."""
     attributes = []
@@ -119,6 +133,8 @@ def build_subject(dn: dict[str, str]):
     return x509.Name(attributes)
 
 
+=======
+>>>>>>> d8219a1dddcd361b0d6e1b37b99964532f93dcac
 def resolve_output_path(output: Path | None, alias: str) -> Path:
     """Acepta una salida .csr/.pem o crea un nombre seguro desde el alias."""
     if output is None:

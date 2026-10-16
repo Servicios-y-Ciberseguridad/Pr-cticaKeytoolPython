@@ -1,5 +1,6 @@
 """Flujo interactivo y generacion de pares RSA."""
-from __future__ import annotations;
+
+from __future__ import annotations
 
 import getpass;
 import sys;
@@ -169,7 +170,6 @@ def validate_country(dn: dict[str, str]) -> None:
     if len(country) != 2 or not country.isascii() or not country.isalpha():
         raise ValueError("C debe ser un codigo de pais de dos letras (p. ej. ES).");
 
-    dn["C"] = country.upper();
 
 def read_dname_interactively() -> dict[str, str]:
     prompts = {

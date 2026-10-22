@@ -108,7 +108,8 @@ def handle_gencert(
         except KeyError as exc:
             raise AliasNotFoundError(
                 f"No existe el alias '{resolved_alias}' en el KeyStore."
-            ) from exc
+            ) from exc;
+        
         private_key = load_private_key(entry, resolved_alias, store_password, keypass)
         ensure_key_pair_matches(private_key, entry, resolved_alias)
         issuer_certificate = load_entry_certificate(entry)

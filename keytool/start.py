@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -25,12 +24,7 @@ def is_crypto_library_available() -> bool:
     return CRYPTO_IMPORT_ERROR is None;
 
 def print_genkeypair_help() -> None:
-    print(
-        "usage: mykeytool.py -genkeypair -keyalg KEYALG [-keystore KEYSTORE] "
-        "[-alias ALIAS] [-dname DNAME] [-storepass STOREPASS] [-keypass KEYPASS] "
-        "[-keysize KEYSIZE]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -genkeypair -keyalg KEYALG [-keystore KEYSTORE] " "[-alias ALIAS] [-dname DNAME] [-storepass STOREPASS] [-keypass KEYPASS] " "[-keysize KEYSIZE]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Required for -genkeypair:", file=sys.stderr)
     print("  -keyalg KEYALG    algoritmo de la clave (solo RSA)", file=sys.stderr)
@@ -41,15 +35,13 @@ def print_genkeypair_help() -> None:
     print("  -dname DNAME", file=sys.stderr)
     print("  -storepass STOREPASS", file=sys.stderr)
     print("  -keypass KEYPASS", file=sys.stderr)
+
     allowed_sizes = ", ".join(map(str, SUPPORTED_KEY_SIZES))
+
     print(f"  -keysize KEYSIZE  valores admitidos: {allowed_sizes}", file=sys.stderr)
 
 def print_certreq_help() -> None:
-    print(
-        "usage: mykeytool.py -certreq [-keystore KEYSTORE] [-alias ALIAS] "
-        "[-storepass STOREPASS] [-keypass KEYPASS] [-file FILE]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -certreq [-keystore KEYSTORE] [-alias ALIAS] " "[-storepass STOREPASS] [-keypass KEYPASS] [-file FILE]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Optional for -certreq:", file=sys.stderr)
     print("  -keystore KEYSTORE", file=sys.stderr)
@@ -59,11 +51,7 @@ def print_certreq_help() -> None:
     print("  -file FILE        archivo .csr o .pem (por defecto: <alias>.csr)", file=sys.stderr)
 
 def print_exportcert_help() -> None:
-    print(
-        "usage: mykeytool.py -exportcert [-keystore KEYSTORE] [-storepass STOREPASS] "
-        "[-alias ALIAS] [-file FILE] [-rfc]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -exportcert [-keystore KEYSTORE] [-storepass STOREPASS] " "[-alias ALIAS] [-file FILE] [-rfc]", file=sys.stderr)
     print("  -keystore KEYSTORE  archivo del almacen", file=sys.stderr)
     print("  -storepass STOREPASS se solicita sin eco si se omite", file=sys.stderr)
     print("  -alias ALIAS        alias del certificado (se solicita si se omite)", file=sys.stderr)
@@ -71,11 +59,7 @@ def print_exportcert_help() -> None:
     print("  -rfc                salida PEM/Base64; por defecto DER binario", file=sys.stderr)
 
 def print_changealias_help() -> None:
-    print(
-        "usage: mykeytool.py -changealias [-keystore KEYSTORE] "
-        "[-storepass STOREPASS] [-alias ALIAS] [-destalias DESTALIAS]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -changealias [-keystore KEYSTORE] " "[-storepass STOREPASS] [-alias ALIAS] [-destalias DESTALIAS]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Optional for -changealias:", file=sys.stderr)
     print("  -keystore KEYSTORE", file=sys.stderr)
@@ -84,11 +68,7 @@ def print_changealias_help() -> None:
     print("  -destalias DESTALIAS alias nuevo", file=sys.stderr)
 
 def print_delete_help() -> None:
-    print(
-        "usage: mykeytool.py -delete [-keystore KEYSTORE] "
-        "[-storepass STOREPASS] [-alias ALIAS]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -delete [-keystore KEYSTORE] " "[-storepass STOREPASS] [-alias ALIAS]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Optional for -delete / --delete:", file=sys.stderr)
     print("  -keystore KEYSTORE", file=sys.stderr)
@@ -96,11 +76,7 @@ def print_delete_help() -> None:
     print("  -alias ALIAS          se solicita si se omite", file=sys.stderr)
 
 def print_list_help() -> None:
-    print(
-        "usage: mykeytool.py -list [-keystore KEYSTORE] [-storepass STOREPASS] "
-        "[-alias ALIAS] [-v | --verbose]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -list [-keystore KEYSTORE] [-storepass STOREPASS] " "[-alias ALIAS] [-v | --verbose]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Optional for -list / --list:", file=sys.stderr)
     print("  -keystore KEYSTORE", file=sys.stderr)
@@ -121,17 +97,10 @@ def print_main_help() -> None:
     print("  -list, --list                lista las entradas del KeyStore", file=sys.stdout)
     print("  -storepasswd, --storepasswd  cambia la contrasena del KeyStore", file=sys.stdout)
     print("", file=sys.stdout)
-    print(
-        "Usa 'mykeytool.py <comando> -h' para ver sus argumentos.",
-        file=sys.stdout,
-    )
+    print("Usa 'mykeytool.py <comando> -h' para ver sus argumentos.", file=sys.stdout)
 
 def print_storepasswd_help() -> None:
-    print(
-        "usage: mykeytool.py -storepasswd [-keystore KEYSTORE] "
-        "[-storepass STOREPASS] [-new NEW_PASSWORD]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -storepasswd [-keystore KEYSTORE] " "[-storepass STOREPASS] [-new NEW_PASSWORD]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Optional for -storepasswd / --storepasswd:", file=sys.stderr)
     print("  -keystore KEYSTORE", file=sys.stderr)
@@ -139,12 +108,7 @@ def print_storepasswd_help() -> None:
     print("  -new NEW_PASSWORD     al menos 8 caracteres; se solicita dos veces sin eco si se omite", file=sys.stderr)
 
 def print_gencert_help() -> None:
-    print(
-        "usage: mykeytool.py -gencert -infile REQUEST -outfile CERTIFICATE "
-        "[-keystore KEYSTORE] [-alias ALIAS] [-storepass STOREPASS] "
-        "[-keypass KEYPASS] [-rfc] [-validity DAYS]",
-        file=sys.stderr,
-    )
+    print("usage: mykeytool.py -gencert -infile REQUEST -outfile CERTIFICATE " "[-keystore KEYSTORE] [-alias ALIAS] [-storepass STOREPASS] " "[-keypass KEYPASS] [-rfc] [-validity DAYS]", file=sys.stderr)
     print("  -infile REQUEST       CSR PKCS#10 en PEM o DER (obligatorio)", file=sys.stderr)
     print("  -outfile CERTIFICATE  archivo de salida (obligatorio)", file=sys.stderr)
     print("  -keystore KEYSTORE    almacen del emisor", file=sys.stderr)
@@ -152,19 +116,13 @@ def print_gencert_help() -> None:
     print("  -storepass STOREPASS  se solicita sin eco si se omite", file=sys.stderr)
     print("  -keypass KEYPASS      se solicita sin eco si se omite", file=sys.stderr)
     print("  -rfc                  salida PEM; por defecto DER", file=sys.stderr)
-    print(
-        f"  -validity DAYS        dias positivos; por defecto {DEFAULT_VALIDITY_DAYS}",
-        file=sys.stderr,
-    )
+    print(f"  -validity DAYS        dias positivos; por defecto {DEFAULT_VALIDITY_DAYS}", file=sys.stderr)
 
 def build_parser() -> argparse.ArgumentParser:
     """Construye y devuelve el analizador de argumentos de la aplicacion."""
     parser = argparse.ArgumentParser(
         prog="mykeytool.py",
-        description=(
-            "Simulador en Python de las funciones esenciales de Java Keytool. "
-            "Selecciona una operacion para gestionar el KeyStore."
-        ),
+        description=("Simulador en Python de las funciones esenciales de Java Keytool. " "Selecciona una operacion para gestionar el KeyStore."),
         epilog="Ejemplo: python3 mykeytool.py --genkeypair",
     );
 
@@ -246,7 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--keystore",
         type=Path,
         default=DEFAULT_KEYSTORE,
-        help="archivo del almacen propio cifrado (por defecto: keystore.myks)",
+        help="archivo del almacen propio cifrado (por defecto: keystore.myks)"
     );
     parser.add_argument("-alias", help="alias de la entrada");
     parser.add_argument("-v", "--verbose", action="store_true", help="detalles publicos para -list");
@@ -260,25 +218,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-infile", type=Path, help="CSR PEM o DER para -gencert");
     parser.add_argument("-outfile", type=Path, help="certificado de salida para -gencert");
     parser.add_argument("-rfc", action="store_true", help="exporta el certificado en PEM");
-    parser.add_argument(
-        "-validity", type=int, default=DEFAULT_VALIDITY_DAYS,
-        metavar="DAYS", help="dias de validez para -gencert (por defecto: 90)",
-    );
-    parser.add_argument(
-        "-file",
-        "--file",
-        type=Path,
-        help="archivo de salida para -certreq o -exportcert",
-    );
+    parser.add_argument("-validity", type=int, default=DEFAULT_VALIDITY_DAYS, metavar="DAYS", help="dias de validez para -gencert (por defecto: 90)");
+    parser.add_argument("-file", "--file", type=Path, help="archivo de salida para -certreq o -exportcert");
 
     return parser;
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Procesa los argumentos y ejecuta el manejador del comando elegido."""
     if not is_crypto_library_available():
-        raise ModuleNotFoundError(
-            "No se pudo importar 'cryptography' con este interprete de Python."
-        ) from CRYPTO_IMPORT_ERROR
+        raise ModuleNotFoundError("No se pudo importar 'cryptography' con este interprete de Python.") from CRYPTO_IMPORT_ERROR
 
     arg_list = list(argv if argv is not None else sys.argv[1:]);
 

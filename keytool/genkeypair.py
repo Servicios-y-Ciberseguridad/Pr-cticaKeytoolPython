@@ -132,10 +132,7 @@ def resolve_key_size(keysize: int | None) -> int:
         if is_key_size_supported(resolved):
             return resolved;
     
-        print(
-            f"Error: tamano no valido; valores admitidos: {allowed}.",
-            file=sys.stderr,
-        );
+        print(f"Error: tamano no valido; valores admitidos: {allowed}.", file=sys.stderr);
 
 def parse_dname(dname: str) -> dict[str, str]:
     parts = [part.strip() for part in dname.split(",") if part.strip()];
@@ -147,9 +144,7 @@ def parse_dname(dname: str) -> dict[str, str]:
         normalized = value.strip();
 
         if not separator or field not in DN_FIELDS or not normalized:
-            raise ValueError(
-                "-dname debe usar el formato CN=..., OU=..., O=..., L=..., ST=..., C=..."
-            );
+            raise ValueError("-dname debe usar el formato CN=..., OU=..., O=..., L=..., ST=..., C=...");
     
         if field in values:
             raise ValueError(f"-dname repite el campo '{field}'.");
@@ -183,12 +178,10 @@ def read_dname_interactively() -> dict[str, str]:
     };
 
     while True:
-        dn = {
-            field: input(prompts[field]).strip() or UNKNOWN_DN_VALUE
-            for field in DN_FIELDS
-        };
+        dn = {field: input(prompts[field]).strip() or UNKNOWN_DN_VALUE for field in DN_FIELDS};
 
         validate_country(dn);
+
         rendered = ", ".join(f"{field}={dn[field]}" for field in DN_FIELDS);
         confirmation = input(f"Is {rendered} correct? [no/yes]: ").strip().lower();
 
@@ -197,7 +190,6 @@ def read_dname_interactively() -> dict[str, str]:
     
         if confirmation in {"", "n", "no"}:
             continue;
-
 
 def resolve_dname(dname: str | None) -> dict[str, str]:
     if dname is not None:
@@ -208,12 +200,7 @@ def resolve_dname(dname: str | None) -> dict[str, str]:
 
     return read_dname_interactively();
 
-def read_new_store_password(
-    supplied: str | None,
-    prompt: str = "Enter new keystore password: ",
-    *,
-    current_password: str | None = None,
-) -> str:
+def read_new_store_password(supplied: str | None, prompt: str = "Enter new keystore password: ", *, current_password: str | None = None) -> str:
     password = supplied if supplied is not None else read_password(prompt);
     
     if not password:
@@ -288,7 +275,6 @@ def resolve_alias(alias: str | None) -> str:
 
     return resolved;
 
-
 def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str:
     if alias is not None:
         resolved = resolve_alias(alias);
@@ -313,13 +299,9 @@ def resolve_unique_alias(alias: str | None, entries: dict[str, KeyEntry]) -> str
         if remaining_attempts == 0:
             raise DuplicateAliasError(f"El alias '{resolved}' ya existe. Se agotaron los 3 intentos.");
     
-        print(
-            f"Error: El alias '{resolved}' ya existe. Intentos restantes: {remaining_attempts}.",
-            file=sys.stderr,
-        );
+        print(f"Error: El alias '{resolved}' ya existe. Intentos restantes: {remaining_attempts}.", file=sys.stderr);
     
     raise DuplicateAliasError(f"El alias '{last_alias}' ya existe.");
-
 
 def handle_genkeypair(
     path: Path = DEFAULT_KEYSTORE,
@@ -358,10 +340,7 @@ def handle_genkeypair(
 
         save_keystore(path, password, entries);
     except getpass.GetPassWarning:
-        print(
-            "Error: no hay un terminal disponible para ocultar la contrasena.",
-            file=sys.stderr,
-        );
+        print("Error: no hay un terminal disponible para ocultar la contrasena.", file=sys.stderr,);
 
         return 1;
     except (KeytoolError, OSError, ValueError) as exc:
@@ -369,15 +348,10 @@ def handle_genkeypair(
 
         return 1;
     except (EOFError, KeyboardInterrupt):
-        print(
-            "\nError: operacion cancelada; no se ha guardado la entrada.",
-            file=sys.stderr,
-        );
+        print("\nError: operacion cancelada; no se ha guardado la entrada.", file=sys.stderr,);
 
         return 1;
 
-    print(
-        f"Exito: par {algorithm} de {resolved_keysize} bits guardado con alias '{alias}' en '{path}'."
-    );
+    print(f"Exito: par {algorithm} de {resolved_keysize} bits guardado con alias '{alias}' en '{path}'.");
 
     return 0;

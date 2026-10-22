@@ -9,7 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cryptography import x509
+<<<<<<< HEAD
+from cryptography.hazmat.primitives import serialization
+=======
 from cryptography.hazmat.primitives import hashes, serialization
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.x509.oid import NameOID
@@ -24,6 +28,8 @@ from keytool.errors import (
     KeystoreNotFoundError,
 )
 from keytool.certreq import load_private_key, resolve_output_path
+<<<<<<< HEAD
+=======
 from keytool.genkeypair import build_subject
 
 
@@ -135,6 +141,7 @@ class CliArgumentTests(unittest.TestCase):
                     input_mock.assert_not_called()
                     password_mock.assert_not_called()
                     self.assertEqual(list(self.directory.iterdir()), [])
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
 
 class GenKeyPairTests(unittest.TestCase):

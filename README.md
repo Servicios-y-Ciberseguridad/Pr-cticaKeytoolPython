@@ -16,9 +16,12 @@ Crear un programa Python que permita:
 - Generar pares de claves pública/privada.
 - Almacenar claves con alias identificativos.
 - Generar solicitudes de firma de certificado (CSR) en formato PEM.
+<<<<<<< HEAD
+=======
 - Firmar certificados X.509 desde solicitudes PKCS#10 en PEM o DER.
 - Exportar el certificado X.509 público asociado a un alias en DER o PEM.
 - Eliminar una entrada del KeyStore mediante su alias.
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 - Consultar desde Python la información de una entrada del KeyStore.
 - Simular funcionalidades básicas de `keytool` en un entorno de consola.
 
@@ -64,7 +67,17 @@ Activa el entorno:
 source .venv/bin/activate
 ```
 
+<<<<<<< HEAD
+La dependencia principal también puede instalarse directamente con:
+
+```bash
+pip install cryptography
+```
+
+Si ya tienes un entorno creado con MSYS2 o MinGW, recrealo con el Python oficial de Windows para poder instalar `cryptography` sin errores de compatibilidad.
+=======
 Instala las dependencias declaradas por el proyecto:
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
 ```bash
 python -m pip install --upgrade pip
@@ -104,6 +117,13 @@ Pr-cticaKeytoolPython/
 ├── keytool/              # Paquete de la aplicación
 │   ├── __init__.py
 │   ├── __main__.py       # Permite ejecutar python -m keytool
+<<<<<<< HEAD
+│   ├── mykeytool.py      # CLI y enrutamiento de comandos
+│   ├── genkeypair.py     # Generacion RSA y flujo interactivo
+│   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
+│   ├── certreq.py        # Comando de solicitudes CSR
+│   ├── changealias.py    # Cambio de alias de una entrada
+=======
 │   ├── start.py          # CLI y enrutamiento de comandos
 │   ├── genkeypair.py     # Generacion RSA y flujo interactivo
 │   ├── keystore.py       # Cifrado, lectura y escritura del KeyStore
@@ -114,6 +134,7 @@ Pr-cticaKeytoolPython/
 │   ├── deletekey.py      # Eliminacion de una entrada
 │   ├── storepasswd.py    # Cambio de contrasena del almacen
 │   ├── listing.py        # Listado autenticado de datos publicos
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 │   └── errors.py         # Errores de dominio
 ├── tests/
 │   ├── test_exportcert.py
@@ -132,22 +153,31 @@ Pr-cticaKeytoolPython/
 El código de la aplicación se agrupa en el paquete `keytool/` y las pruebas
 permanecen en `tests/`. Cada módulo del paquete tiene una responsabilidad:
 
+<<<<<<< HEAD
+1. `keytool/mykeytool.py` interpreta argumentos y enruta los comandos.
+=======
 1. `keytool/start.py` interpreta argumentos y enruta los comandos.
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 2. `keytool/genkeypair.py` recoge los datos, genera el par RSA y prepara la entrada.
 3. `keytool/certreq.py` recupera una entrada existente, firma el CSR y exporta el PEM.
 4. `keytool/changealias.py` valida las entradas y solicita renombrar un alias.
 5. `keytool/keystore.py` cifra, valida, lee y escribe el almacén.
 6. `keytool/errors.py` define los errores de dominio compartidos.
+<<<<<<< HEAD
+=======
 7. `keytool/listing.py` lista alias y detalles públicos sin descifrar claves privadas.
 8. `keytool/storepasswd.py` autentica y cambia la contraseña del almacén.
 9. `keytool/gencert.py` valida el CSR y exporta un certificado firmado.
 10. `keytool/exportcert.py` exporta el certificado asociado a un alias sin acceder
     a la clave privada.
 11. `keytool/deletekey.py` elimina una entrada autenticando el KeyStore.
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
 El archivo raíz `mykeytool.py` conserva el comando de ejecución existente. También
 puedes iniciar la aplicación mediante `python -m keytool`.
 
+<<<<<<< HEAD
+=======
 ### Decisiones relevantes
 
 - El KeyStore `MYKEYSTORE` es un formato propio versionado; no es un almacén JKS
@@ -159,6 +189,7 @@ puedes iniciar la aplicación mediante `python -m keytool`.
 - Los certificados autofirmados de `genkeypair` no son autoridades certificadoras
   (`CA=false`). `gencert` firma CSR, pero no valida la confianza de una cadena CA.
 
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 El recorrido de `--certreq` se puede explicar en tres pasos:
 
 ```text
@@ -213,6 +244,30 @@ argumentos o introducir cuando se soliciten. Por ejemplo:
 python mykeytool.py --genkeypair -keyalg RSA -keysize 2048 -alias demo -dname "CN=Demo, OU=Seguridad, O=Universidad, L=Madrid, ST=Madrid, C=ES"
 ```
 
+<<<<<<< HEAD
+La ayuda específica de `certreq` muestra sus opciones compatibles con el estilo de
+`keytool`:
+
+```bash
+python mykeytool.py -certreq --help
+```
+
+El flujo mas simple para generar un par de claves es:
+
+```bash
+python mykeytool.py --genkeypair -keyalg RSA
+python mykeytool.py --certreq -keystore keystore.myks
+python mykeytool.py --changealias -keystore keystore.myks -alias mykey -destalias nuevaClave
+```
+
+`-changealias` también admite `--changealias`. Si se omiten `-storepass`,
+`-alias` o `-destalias`, los solicita de forma interactiva; la contraseña se
+solicita sin eco. El cambio conserva todos los datos de la entrada, incluida la
+clave privada en su forma cifrada y cualquier certificado asociado, sin pedir ni
+descifrar la contraseña de la clave privada.
+
+Tambien admite una sintaxis parecida a `keytool` para `genkeypair`:
+=======
 Al omitir `-storepass` y `-keypass`, se solicitan sin eco. Ejemplo del mensaje de
 resultado al usar el alias y el almacén de ejemplo:
 
@@ -259,6 +314,7 @@ solicita sin eco. El cambio conserva los datos de la entrada, incluida la clave
 privada cifrada y los certificados asociados.
 
 ### Eliminar una entrada del KeyStore
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
 ```bash
 python mykeytool.py -delete -keystore keystore.myks -alias demo
@@ -266,6 +322,8 @@ python -m keytool --delete -keystore keystore.myks -alias demo
 python mykeytool.py --delete --help
 ```
 
+<<<<<<< HEAD
+=======
 `-delete` / `--delete` elimina de forma permanente la entrada indicada por
 `-alias` después de autenticar el KeyStore con `-storepass`. Si se omite la
 contraseña, se solicita sin eco; si se omite el alias, se solicita por consola.
@@ -456,6 +514,7 @@ detallado. No hay salida parcial. No se vuelcan entradas, claves privadas, contr
 etiquetas de autenticación. Un alias inexistente, contraseña incorrecta o
 almacén dañado produce código de salida 1 con un mensaje claro y sin traza.
 
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 Para generar un CSR a partir de una entrada existente:
 
 ```bash
@@ -491,7 +550,11 @@ controlado y es necesario ejecutar de nuevo el comando.
 
 - `keyalg`
 - `keysize` con valor por defecto `2048`; admite `2048`, `3072`, `4096`, `7680`
+<<<<<<< HEAD
+  y `15360`, y muestra estas opciones en el prompt
+=======
   y `15360`
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 - contrasena del KeyStore
 - contrasena de la clave (`RETURN` reutiliza la del KeyStore)
 - alias con valor por defecto `mykey`
@@ -571,6 +634,18 @@ Si quieres forzar manualmente el interprete del entorno virtual, usa:
 .\.venv\Scripts\python.exe .\mykeytool.py --genkeypair -keyalg RSA
 ```
 
+<<<<<<< HEAD
+## Matriz de pruebas ejecutadas
+
+| Área | Verificación automatizada | Resultado esperado |
+|---|---|---|
+| `genkeypair` | RSA 2048/3072/4096, DN, alias duplicado y persistencia cifrada | La entrada se crea sin exponer secretos |
+| KeyStore | Contraseña correcta/incorrecta, formato inválido, manipulación y archivo inexistente | Acceso autenticado o error controlado |
+| `certreq` | CSR PEM, firma SHA-256, sujeto DN y coincidencia de clave pública | CSR válido y firmado por la clave del alias |
+| Privacidad | Inspección del PEM y de los mensajes de consola | No aparece ninguna clave privada ni contraseña |
+| Errores de CSR | Alias inexistente, contraseña de almacén/clave incorrecta y almacén dañado | Código de salida 1, sin traceback ni archivo parcial |
+| CLI | Ayuda general y ayuda específica de ambos comandos | Opciones y sintaxis visibles |
+=======
 ## Historial de contribuciones
 
 Se conserva el historial Git de ambos integrantes. Como ejemplos de commits
@@ -612,6 +687,7 @@ pruebas concretas, no solo funcionalidades disponibles en la aplicación.
 | Alias duplicado | `test_duplicate_alias_and_wrong_password_preserve_file` | Operación rechazada y archivo original conservado byte a byte |
 | Almacén inexistente o dañado | `test_certreq_reports_missing_or_damaged_keystore` y `test_tampered_or_invalid_store_is_not_overwritten` | Mensaje de error, ninguna solicitud parcial y almacén dañado sin sobrescribir |
 | Alias inexistente | `test_certreq_rejects_missing_alias_without_creating_output` | Error claro, ningún CSR creado y almacén intacto |
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 
 La suite completa se ejecuta con:
 
@@ -619,6 +695,8 @@ La suite completa se ejecuta con:
 python -m unittest discover -s tests -v
 ```
 
+<<<<<<< HEAD
+=======
 Para una demostración centrada en la cobertura mínima, ejecuta solo el módulo de
 integración (56 pruebas, incluidas las seis de argumentos):
 
@@ -658,6 +736,7 @@ python -m unittest discover -s tests -p test_exportcert.py -v
 python -m unittest discover -s tests -p test_deletekey.py -v
 ```
 
+>>>>>>> 1791aac76183172cda1fd3b155df7dfdc42a3755
 ## Nota
 
 Este repositorio está pensado como una práctica académica y puede ir ampliándose según el enunciado concreto del ejercicio.

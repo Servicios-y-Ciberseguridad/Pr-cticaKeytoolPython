@@ -10,7 +10,7 @@ from pathlib import Path
 from .certreq import open_existing_keystore
 from .errors import AliasNotFoundError, KeytoolError
 from .genkeypair import resolve_alias
-from .keystore import DEFAULT_KEYSTORE, ensure_crypto_available, write_bytes_atomic
+from .keystore import DEFAULT_KEYSTORE, write_bytes_atomic
 from .listing import load_entry_certificate
 
 try:
@@ -46,7 +46,6 @@ def handle_exportcert(
 ) -> int:
     """Exporta solo el certificado publico de un alias, sin acceder a su clave."""
     try:
-        ensure_crypto_available()
         _, entries = open_existing_keystore(path, storepass)
         resolved_alias = resolve_alias(alias)
         try:

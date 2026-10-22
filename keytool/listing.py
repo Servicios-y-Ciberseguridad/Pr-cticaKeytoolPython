@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .certreq import open_existing_keystore
 from .errors import AliasNotFoundError, InvalidKeystoreError, KeytoolError
-from .keystore import DEFAULT_KEYSTORE, DN_FIELDS, KeyEntry, ensure_crypto_available
+from .keystore import DEFAULT_KEYSTORE, DN_FIELDS, KeyEntry
 
 try:
     from cryptography import x509

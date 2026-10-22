@@ -14,7 +14,7 @@ from .certreq import (
 )
 from .errors import AliasNotFoundError, KeytoolError
 from .genkeypair import build_subject, resolve_alias
-from .keystore import DEFAULT_KEYSTORE, ensure_crypto_available, write_bytes_atomic
+from .keystore import DEFAULT_KEYSTORE, write_bytes_atomic
 from .listing import load_entry_certificate
 
 try:
@@ -30,7 +30,6 @@ except ModuleNotFoundError:
     rsa = None
 
 DEFAULT_VALIDITY_DAYS = 90
-
 
 def load_csr(path: Path) -> x509.CertificateSigningRequest:
     data = path.read_bytes()
@@ -49,22 +48,24 @@ def load_csr(path: Path) -> x509.CertificateSigningRequest:
         raise ValueError("CSR no valido o firma incorrecta.") from exc
     return csr
 
-
 def issuer_can_certify(certificate: x509.Certificate | None) -> bool:
     if certificate is None:
         return False
+    
     try:
         constraints = certificate.extensions.get_extension_for_class(x509.BasicConstraints)
     except x509.ExtensionNotFound:
         return False
+    
     if not constraints.value.ca:
         return False
+    
     try:
         usage = certificate.extensions.get_extension_for_class(x509.KeyUsage)
     except x509.ExtensionNotFound:
         return True
+    
     return usage.value.key_cert_sign
-
 
 def validate_output_path(output: Path, keystore: Path, request: Path) -> None:
     for protected in (keystore, request):
@@ -74,7 +75,6 @@ def validate_output_path(output: Path, keystore: Path, request: Path) -> None:
             raise ValueError(
                 "El certificado no puede sobrescribir el KeyStore ni el CSR de entrada."
             )
-
 
 def handle_gencert(
     path: Path = DEFAULT_KEYSTORE,
@@ -89,7 +89,6 @@ def handle_gencert(
 ) -> int:
     """Firma un certificado de entidad final y exporta solo datos publicos."""
     try:
-        ensure_crypto_available()
         if infile is None or outfile is None:
             raise ValueError("-gencert requiere -infile REQUEST y -outfile CERTIFICATE.")
         if validity <= 0:
@@ -112,8 +111,10 @@ def handle_gencert(
         
         private_key = load_private_key(entry, resolved_alias, store_password, keypass)
         ensure_key_pair_matches(private_key, entry, resolved_alias)
+
         issuer_certificate = load_entry_certificate(entry)
         issuer_public_key = private_key.public_key()
+
         if issuer_certificate is not None:
             if issuer_certificate.public_key().public_bytes(
                 serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
